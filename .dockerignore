@@ -1,5 +1,19 @@
-# Lista blanca: la imagen solo necesita el visor
-*
-!requirements-web.txt
-!web/
+# Excluye lo que la imagen no necesita. Sin negaciones (!): funciona igual en todos los
+# motores de construcción (Docker clásico, BuildKit, buildah, kaniko...).
+# La imagen solo usa: requirements-web.txt y web/
+.git
+.github
+.gitignore
+.env
+.env.*
+songs
+third_party
+core
+deploy
+cli.py
+serve.py
+README.md
+requirements.txt
+docker-compose.yml
 **/__pycache__
+**/*.pyc
