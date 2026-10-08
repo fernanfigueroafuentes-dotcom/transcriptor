@@ -9,8 +9,8 @@ services:
       VIEWER_PASSWORD: ${VIEWER_PASSWORD:?define VIEWER_PASSWORD en .env}
     volumes:
       # Las canciones viven fuera de la imagen y se montan en solo lectura.
-      # Ruta ABSOLUTA del servidor: una relativa (./songs) la toman como nombre de volumen
-      # y falla con "includes invalid characters for a local volume name".
+      # Debe ser una ruta ABSOLUTA del servidor: las rutas relativas se interpretan
+      # como nombres de volumen.
       - ${SONGS_PATH:-/opt/transcriptor/songs}:/data/songs:ro
     # Solo accesible desde el propio servidor (el proxy inverso con HTTPS apunta aquí).
     # Si el proxy de OpenShip enruta por la red de Docker, puedes quitar este bloque.
