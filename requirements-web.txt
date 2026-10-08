@@ -1,0 +1,4 @@
+# Solo el visor web (sin IA ni GPU): es lo que corre en el servidor.
+# Versiones fijadas a las probadas en local.
+fastapi==0.142.4
+uvicorn==0.54.0

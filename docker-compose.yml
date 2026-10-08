@@ -1,0 +1,21 @@
+services:
+  viewer:
+    build: .
+    image: transcriptor-viewer:latest
+    restart: unless-stopped
+    environment:
+      # Se leen del archivo .env (copia .env.example). Sin ellas, no arranca.
+      VIEWER_USER: ${VIEWER_USER:?define VIEWER_USER en .env}
+      VIEWER_PASSWORD: ${VIEWER_PASSWORD:?define VIEWER_PASSWORD en .env}
+    volumes:
+      # Las canciones viven fuera de la imagen y se montan en solo lectura
+      - ${SONGS_PATH:-./songs}:/data/songs:ro
+    # Solo accesible desde el propio servidor (el proxy inverso con HTTPS apunta aquí).
+    # Si el proxy de OpenShip enruta por la red de Docker, puedes quitar este bloque.
+    ports:
+      - "127.0.0.1:${HOST_PORT:-8000}:8000"
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true

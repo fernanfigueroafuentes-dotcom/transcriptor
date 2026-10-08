@@ -1,0 +1,11 @@
+# Instalar en este orden (ver README.md):
+#   1) PyTorch 2.8.0 con CUDA 12.8 (necesario para RTX 5060 / Blackwell)
+#   2) pip install -r requirements.txt
+#   3) pip install -U ctranslate2   (whisperx fija una versión que busca cuDNN 8; torch 2.8 trae cuDNN 9)
+demucs
+whisperx
+faster-whisper
+librosa
+numpy<2
+fastapi
+uvicorn

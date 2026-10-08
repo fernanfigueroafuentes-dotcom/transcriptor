@@ -1,0 +1,11 @@
+# Secretos
+.env
+
+# Datos y modelos: no van al repositorio
+songs/
+third_party/
+.venv/
+
+# Python
+__pycache__/
+*.pyc

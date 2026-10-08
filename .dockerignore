@@ -1,0 +1,5 @@
+# Lista blanca: la imagen solo necesita el visor
+*
+!requirements-web.txt
+!web/
+**/__pycache__

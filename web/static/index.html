@@ -1,0 +1,825 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Visor de acordes</title>
+<link rel="icon" href="data:,">
+<style>
+:root {
+  --bg: #fbfaf7; --panel: #ffffff; --ink: #1d1d1f; --muted: #6b6b72; --line: #e3e0d8;
+  --accent: #0b6e4f; --accent-ink: #ffffff; --chord: #b4340a;
+  --row-on: #fff6d6; --word-on: #ffd54a; --seg-a: #e9efe9; --seg-b: #dfe7e0; --seg-on: #9fd8bd;
+  --fs: 22px;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #121316; --panel: #1b1c21; --ink: #ececf0; --muted: #9a9aa6; --line: #2a2b33;
+    --accent: #4fd1a1; --accent-ink: #06261b; --chord: #ff9d6c;
+    --row-on: #26241a; --word-on: #6b5a10; --seg-a: #23282a; --seg-b: #1d2224; --seg-on: #2d6a52;
+  }
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  margin: 0; background: var(--bg); color: var(--ink);
+  font: 16px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+#app {
+  display: grid; grid-template-rows: auto 1fr auto; grid-template-columns: minmax(0, 1fr);
+  height: 100dvh;
+}
+header { grid-row: 1; grid-column: 1 / -1; }
+main { grid-row: 2; grid-column: 1; }
+footer { grid-row: 3; grid-column: 1 / -1; }
+
+/* Barra superior */
+header {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px;
+  padding: 10px 16px; background: var(--panel); border-bottom: 1px solid var(--line);
+}
+.group { display: flex; align-items: center; gap: 6px; }
+.group > label, .toggle { color: var(--muted); font-size: 13px; }
+select, button {
+  font: inherit; color: var(--ink); background: var(--bg);
+  border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; cursor: pointer;
+}
+button:hover, select:hover { border-color: var(--accent); }
+button:focus-visible, select:focus-visible, input:focus-visible {
+  outline: 2px solid var(--accent); outline-offset: 2px;
+}
+#songSelect { min-width: 220px; max-width: 100%; font-weight: 600; }
+.val { min-width: 2.2em; text-align: center; font-variant-numeric: tabular-nums; }
+.toggle { display: flex; align-items: center; gap: 6px; }
+
+/* Hoja de acordes */
+main { overflow-y: auto; padding: 20px 16px 80px; }
+#sheet { max-width: 900px; margin: 0 auto; font-size: var(--fs); }
+.row { padding: 6px 10px; border-radius: 10px; margin: 2px 0; }
+.row.on { background: var(--row-on); }
+.row.instr { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 14px; }
+.tag {
+  font-size: 12px; letter-spacing: .05em; text-transform: uppercase; color: var(--muted);
+  min-width: 6.5em;
+}
+.tok { display: inline-flex; flex-direction: column; margin-right: .45em; vertical-align: bottom; }
+.chords { display: flex; gap: .4em; min-height: 1.4em; line-height: 1.4; }
+.chord {
+  font: 700 .82em/1.3 ui-monospace, "Cascadia Mono", Consolas, monospace;
+  color: var(--chord); background: none; border: 0; padding: 0 2px; border-radius: 4px;
+}
+.chord.on { background: var(--chord); color: var(--bg); }
+.word { cursor: pointer; border-radius: 4px; padding: 0 2px; }
+.tok.on .word { background: var(--word-on); }
+.empty { color: var(--muted); text-align: center; padding: 60px 16px; }
+
+/* Reproductor */
+footer { background: var(--panel); border-top: 1px solid var(--line); padding: 10px 16px 14px; }
+.bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin-bottom: 10px; }
+#play {
+  width: 44px; height: 44px; border-radius: 50%; font-size: 18px;
+  background: var(--accent); color: var(--accent-ink); border-color: var(--accent);
+}
+#curChord {
+  font: 800 28px/1 ui-monospace, "Cascadia Mono", Consolas, monospace; color: var(--chord);
+  min-width: 3.4em;
+}
+#time { color: var(--muted); font-variant-numeric: tabular-nums; }
+.spacer { flex: 1; }
+.loop-on { border-color: var(--accent); color: var(--accent); font-weight: 700; }
+#timeline {
+  position: relative; height: 38px; border-radius: 8px; overflow: hidden;
+  background: var(--seg-a); cursor: pointer; touch-action: none;
+}
+.seg {
+  position: absolute; top: 0; bottom: 0; background: var(--seg-a);
+  border-right: 1px solid var(--bg); overflow: hidden; display: flex; align-items: center;
+  font: 600 11px/1 ui-monospace, "Cascadia Mono", Consolas, monospace; color: var(--muted);
+}
+.seg:nth-child(even) { background: var(--seg-b); }
+.seg.on { background: var(--seg-on); color: var(--ink); }
+.seg span { padding-left: 4px; white-space: nowrap; pointer-events: none; }
+#loopRegion { position: absolute; top: 0; bottom: 0; background: rgba(79, 209, 161, .25);
+  border-left: 2px solid var(--accent); border-right: 2px solid var(--accent); display: none;
+  pointer-events: none; }
+#playhead { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--ink);
+  pointer-events: none; left: 0; }
+.hint { color: var(--muted); font-size: 12px; margin-top: 6px; }
+
+/* Panel de diagramas */
+#panel {
+  display: none; grid-row: 2; grid-column: 2; overflow-y: auto;
+  background: var(--panel); border-left: 1px solid var(--line); padding: 12px 14px 28px;
+}
+#app.panel-open { grid-template-columns: minmax(0, 1fr) 390px; }
+#app.panel-open #panel { display: block; }
+.panel-head { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.panel-head strong { flex: 1; font-size: 17px; }
+.seg-ctl { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.seg-ctl button { border: 0; border-radius: 0; background: transparent; padding: 5px 10px; font-size: 14px; }
+.seg-ctl button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); }
+#panelToggle[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); font-weight: 700; }
+#panel h2 {
+  font-size: 12px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase;
+  color: var(--muted); margin: 16px 0 8px;
+}
+.card {
+  display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 8px 6px;
+  border: 1px solid var(--line); border-radius: 12px; background: var(--bg); color: var(--ink);
+  font: inherit; text-align: center;
+}
+.card-seek { border: 0; background: none; padding: 0; cursor: pointer; border-radius: 6px; }
+.card-seek:hover .card-name { text-decoration: underline; }
+.card.on { border-color: var(--chord); box-shadow: inset 0 0 0 2px var(--chord); }
+.card.big { padding: 12px 8px; border-color: var(--chord); }
+.card-name { font: 800 18px/1 ui-monospace, "Cascadia Mono", Consolas, monospace; color: var(--chord); }
+.card.big .card-name { font-size: 30px; }
+.dgms { display: flex; flex-wrap: wrap; gap: 6px 10px; justify-content: center; align-items: flex-end; width: 100%; }
+#cardGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+.nodgm { color: var(--muted); font-size: 12px; padding: 20px 4px; }
+svg.dgm { display: block; height: auto; }
+svg.guitar { width: 70px; }
+svg.piano { width: 100%; }
+.card.big svg.guitar { width: 112px; }
+figure.fig { margin: 0; display: flex; flex-direction: column; align-items: center; gap: 3px; }
+.fig.g { flex: none; }
+.fig.p { flex: 1 1 120px; min-width: 0; max-width: 150px; }
+.card.big .fig.p { flex: 1 1 200px; max-width: 300px; }
+/* Selector de digitación / inversión */
+.vsel { display: flex; align-items: center; justify-content: center; gap: 4px; font-size: 11px; color: var(--muted); min-height: 24px; }
+.vsel button { padding: 0 8px; line-height: 20px; border-radius: 6px; font-size: 15px; }
+.vlabel { min-width: 2.6em; text-align: center; font-variant-numeric: tabular-nums; }
+.card.big .vlabel { font-size: 12px; min-width: 10em; }
+.dgm .ln { stroke: var(--ink); stroke-width: 1; fill: none; opacity: .7; }
+.dgm .nut { fill: var(--ink); }
+.dgm .dot { fill: var(--ink); }
+.dgm .dot.root { fill: var(--chord); }
+.dgm .open { fill: none; stroke: var(--ink); stroke-width: 1.3; }
+.dgm .open.root { stroke: var(--chord); }
+.dgm .mute { stroke: var(--ink); stroke-width: 1.4; fill: none; }
+.dgm .fretnum { fill: var(--muted); font: 600 9px system-ui, sans-serif; }
+.dgm .wk { fill: #fbfbf8; stroke: #55555c; stroke-width: .7; }
+.dgm .wk.on { fill: #ffd0b8; }
+.dgm .wk.root { fill: #ff9d6c; }
+.dgm .bk { fill: #1a1a1f; stroke: #000; stroke-width: .5; }
+.dgm .bk.on { fill: #b4340a; }
+.dgm .bk.root { fill: #e0561c; }
+.dgm .kl { fill: #1d1d1f; font: 700 6.5px system-ui, sans-serif; pointer-events: none; }
+.dgm .kl.blk { fill: #fff; }
+@media (max-width: 999px) {
+  #app.panel-open { grid-template-columns: minmax(0, 1fr); }
+  #panel { grid-column: 1; border-left: 0; z-index: 5; }
+}
+@media (max-width: 560px) {
+  #songSelect { min-width: 0; width: 100%; }
+  :root { --fs: 19px; }
+  header { padding: 8px 12px; gap: 6px 12px; }
+  footer { padding: 8px 12px 10px; }
+  .bar { gap: 6px 8px; margin-bottom: 8px; }
+  .bar button { padding: 5px 8px; font-size: 14px; }
+  #play { width: 40px; height: 40px; padding: 0; }
+  #curChord { font-size: 22px; min-width: 2.6em; }
+  .spacer { display: none; }
+  .group.loop { width: 100%; justify-content: space-between; }
+  .group.loop button { flex: 1; }
+  .hint { display: none; }
+  /* Panel de diagramas: guitarra y piano lado a lado para ocupar menos alto */
+  #panel { padding: 8px 12px 20px; }
+  #panel h2 { margin: 10px 0 6px; }
+  .card.big { padding: 8px 6px; }
+  .card.big .card-name { font-size: 24px; }
+  .card.big .dgms { flex-wrap: nowrap; gap: 8px; }
+  .card.big svg.guitar { width: 78px; }
+  .card.big .fig.p { flex: 1; max-width: none; }
+  .card.big .vlabel { min-width: 0; font-size: 11px; }
+  #cardGrid { grid-template-columns: repeat(auto-fill, minmax(135px, 1fr)); }
+}
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <select id="songSelect" aria-label="Canción"></select>
+    <div class="group">
+      <label>Tono</label>
+      <button id="trDown" aria-label="Bajar un semitono">−</button>
+      <span class="val" id="trVal">0</span>
+      <button id="trUp" aria-label="Subir un semitono">+</button>
+      <button id="accToggle" title="Alternar sostenidos y bemoles" aria-label="Alternar sostenidos y bemoles">♯</button>
+    </div>
+    <div class="group">
+      <label for="speed">Velocidad</label>
+      <select id="speed">
+        <option value="0.5">0.5×</option><option value="0.75">0.75×</option>
+        <option value="0.9">0.9×</option><option value="1" selected>1×</option>
+        <option value="1.1">1.1×</option><option value="1.25">1.25×</option>
+      </select>
+    </div>
+    <div class="group">
+      <label>Texto</label>
+      <button id="fontDown" aria-label="Texto más pequeño">A−</button>
+      <button id="fontUp" aria-label="Texto más grande">A+</button>
+    </div>
+    <label class="toggle"><input type="checkbox" id="autoscroll" checked> Seguir la letra</label>
+    <button id="panelToggle" aria-pressed="false" title="Diagramas de guitarra y piano">Diagramas</button>
+  </header>
+
+  <main id="main"><div id="sheet"></div></main>
+
+  <aside id="panel" aria-label="Diagramas de acordes">
+    <div class="panel-head">
+      <strong>Diagramas</strong>
+      <div class="seg-ctl" id="instr" role="group" aria-label="Instrumento">
+        <button type="button" data-i="guitar" aria-pressed="false">Guitarra</button>
+        <button type="button" data-i="piano" aria-pressed="false">Piano</button>
+        <button type="button" data-i="both" aria-pressed="true">Ambos</button>
+      </div>
+      <button id="panelClose" type="button" aria-label="Cerrar diagramas">✕</button>
+    </div>
+    <h2>Ahora suena</h2>
+    <div id="nowCard"></div>
+    <h2>Acordes de la canción</h2>
+    <div id="cardGrid"></div>
+  </aside>
+
+  <footer>
+    <div class="bar">
+      <button id="play" aria-label="Reproducir">▶</button>
+      <span id="curChord" aria-label="Acorde actual">–</span>
+      <span id="time">0:00 / 0:00</span>
+      <button id="back5" aria-label="Retroceder 5 segundos">−5 s</button>
+      <button id="fwd5" aria-label="Adelantar 5 segundos">+5 s</button>
+      <span class="spacer"></span>
+      <span class="group loop">
+        <button id="loopA">Marcar A</button>
+        <button id="loopB">Marcar B</button>
+        <button id="loopClear">Quitar bucle</button>
+      </span>
+    </div>
+    <div id="timeline" role="slider" aria-label="Posición en la canción"></div>
+    <div class="hint">Clic en una palabra o un acorde para saltar ahí. Espacio: reproducir/pausar · ← →: ±5 s.</div>
+  </footer>
+</div>
+<audio id="audio" preload="metadata"></audio>
+
+<script src="chords.js"></script>
+<script>
+"use strict";
+const $ = (sel) => document.querySelector(sel);
+const audio = $("#audio");
+
+// ---------- Estado ----------
+const TOL = 0.15;          // tolerancia (s) para pegar un acorde a una palabra
+const INSTR_MIN = 3.0;     // pasaje sin letra mínimo (s) para mostrarlo como instrumental
+const SHARP = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
+const FLAT  = ["C","Db","D","Eb","E","F","Gb","G","Ab","A","Bb","B"];
+
+let chords = [];           // [{start,end,chord}]
+let rows = [];             // filas de la hoja (líneas e instrumentales)
+let rowEls = [], tokEls = [], chordEls = [], segEls = [], chordLabels = [];
+let rowStarts = [];
+let curRow = -1, curTok = -1, curChord = -2;
+let shift = 0, useFlats = false;
+const loop = { a: null, b: null };
+
+// ---------- Preferencias (opcionales: pueden fallar en modo privado) ----------
+function loadPref(key, fallback) {
+  try { const v = localStorage.getItem(key); return v === null ? fallback : JSON.parse(v); }
+  catch { return fallback; }
+}
+function savePref(key, value) {
+  try { localStorage.setItem(key, JSON.stringify(value)); } catch { /* sin almacenamiento */ }
+}
+let fontSize = loadPref("fontSize", 22);
+useFlats = loadPref("useFlats", false);
+$("#autoscroll").checked = loadPref("autoscroll", true);
+let instrument = loadPref("instrument", "both");               // guitar | piano | both
+let panelOpen = loadPref("panelOpen", window.innerWidth >= 1000);
+let choice = loadPref("voicingChoice", {});                    // { "B": { g: 1, p: 0 } }
+
+// ---------- Transposición ----------
+function transpose(name) {
+  const m = /^([A-G])([#b]?)(.*)$/.exec(name);
+  if (!m) return name;
+  const root = m[1] + m[2];
+  let idx = SHARP.indexOf(root);
+  if (idx < 0) idx = FLAT.indexOf(root);
+  if (idx < 0) return name;
+  const next = (((idx + shift) % 12) + 12) % 12;
+  return (useFlats ? FLAT : SHARP)[next] + m[3];
+}
+
+function refreshChordLabels() {
+  chordEls.forEach((el, i) => { if (el) el.textContent = transpose(chords[i].chord); });
+  segEls.forEach((el, i) => { if (el) el.firstChild.textContent = transpose(chords[i].chord); });
+  $("#trVal").textContent = (shift > 0 ? "+" : "") + shift;
+  $("#accToggle").textContent = useFlats ? "♭" : "♯";
+  curChord = -2; // fuerza refrescar el acorde grande
+  if (panelOpen) renderGrid();
+}
+
+// ---------- Construcción de filas (misma lógica que merge.py) ----------
+function buildRows(lines, chordList) {
+  const pending = chordList.map((c, i) => ({ ...c, i }));
+  const out = [];
+  for (const line of lines) {
+    const toks = line.tokens || [];
+    const first = (toks.find((t) => t.start != null) || {}).start;
+    if (first != null) {
+      const lead = [];
+      for (const c of pending) { if (c.end > first - TOL) break; lead.push(c); }
+      if (lead.length && first - lead[0].start >= INSTR_MIN) {
+        pending.splice(0, lead.length);
+        out.push({ type: "instr", label: "Instrumental", chords: lead, start: lead[0].start });
+      }
+    }
+    const tokens = toks.map((t) => {
+      const attached = [];
+      while (pending.length && t.start != null && pending[0].start <= t.start + TOL) {
+        attached.push(pending.shift());
+      }
+      return { word: t.word, start: t.start, chords: attached };
+    });
+    if (tokens.length) out.push({ type: "line", tokens, start: first != null ? first : 0 });
+  }
+  if (pending.length) {
+    const rest = pending.splice(0);
+    out.push({ type: "instr", label: "Final", chords: rest, start: rest[0].start });
+  }
+  return out;
+}
+
+// ---------- Dibujo ----------
+function makeChordButton(c) {
+  const b = document.createElement("button");
+  b.className = "chord";
+  b.type = "button";
+  b.textContent = transpose(c.chord);
+  b.addEventListener("click", () => seek(c.start));
+  chordEls[c.i] = b;
+  return b;
+}
+
+function renderSheet() {
+  const sheet = $("#sheet");
+  sheet.replaceChildren();
+  rowEls = []; tokEls = []; chordEls = [];
+  if (!rows.length) {
+    const p = document.createElement("p");
+    p.className = "empty";
+    p.textContent = "Esta canción no tiene letra ni acordes para mostrar.";
+    sheet.append(p);
+    return;
+  }
+  rows.forEach((row, r) => {
+    const el = document.createElement("div");
+    el.className = "row " + (row.type === "instr" ? "instr" : "line");
+    tokEls[r] = [];
+    if (row.type === "instr") {
+      const tag = document.createElement("span");
+      tag.className = "tag";
+      tag.textContent = row.label;
+      el.append(tag);
+      row.chords.forEach((c) => el.append(makeChordButton(c)));
+    } else {
+      row.tokens.forEach((t, k) => {
+        const tok = document.createElement("span");
+        tok.className = "tok";
+        const cs = document.createElement("span");
+        cs.className = "chords";
+        t.chords.forEach((c) => cs.append(makeChordButton(c)));
+        const w = document.createElement("span");
+        w.className = "word";
+        w.textContent = t.word;
+        w.addEventListener("click", () => { if (t.start != null) seek(t.start); });
+        tok.append(cs, w);
+        el.append(tok);
+        tokEls[r][k] = tok;
+      });
+    }
+    sheet.append(el);
+    rowEls[r] = el;
+  });
+  // Inicios monótonos para poder buscar la fila actual con búsqueda binaria
+  let maxStart = 0;
+  rowStarts = rows.map((r) => (maxStart = Math.max(maxStart, r.start)));
+}
+
+function buildTimeline() {
+  const tl = $("#timeline");
+  const dur = duration();
+  tl.replaceChildren();
+  segEls = [];
+  chords.forEach((c, i) => {
+    const d = document.createElement("div");
+    d.className = "seg";
+    d.style.left = (c.start / dur) * 100 + "%";
+    d.style.width = Math.max(((c.end - c.start) / dur) * 100, 0.2) + "%";
+    const s = document.createElement("span");
+    s.textContent = transpose(c.chord);
+    d.append(s);
+    tl.append(d);
+    segEls[i] = d;
+  });
+  const region = document.createElement("div");
+  region.id = "loopRegion";
+  const head = document.createElement("div");
+  head.id = "playhead";
+  tl.append(region, head);
+  updateLoopRegion();
+}
+
+// ---------- Reproducción ----------
+function duration() {
+  if (audio.duration && isFinite(audio.duration)) return audio.duration;
+  return chords.length ? chords[chords.length - 1].end : 1;
+}
+function fmt(t) {
+  t = Math.max(0, Math.floor(t || 0));
+  return Math.floor(t / 60) + ":" + String(t % 60).padStart(2, "0");
+}
+function seek(t) {
+  if (!audio.src) return;
+  audio.currentTime = Math.max(0, Math.min(t, duration()));
+  update(true);
+}
+function togglePlay() {
+  if (!audio.src) return;
+  if (audio.paused) audio.play().catch(() => {}); else audio.pause();
+}
+
+// Desplaza la hoja solo si la fila se acerca a los bordes (evita animaciones constantes)
+function ensureVisible(el, smooth) {
+  const area = $("#main").getBoundingClientRect();
+  const box = el.getBoundingClientRect();
+  const margin = Math.min(90, area.height * 0.2);
+  if (box.top < area.top + margin || box.bottom > area.bottom - margin) {
+    el.scrollIntoView({ block: "center", behavior: smooth ? "smooth" : "instant" });
+  }
+}
+
+function lastIndexLE(arr, t) {   // último índice con arr[i] <= t (-1 si ninguno)
+  let lo = 0, hi = arr.length - 1, ans = -1;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    if (arr[mid] <= t) { ans = mid; lo = mid + 1; } else hi = mid - 1;
+  }
+  return ans;
+}
+
+function update(force) {
+  const t = audio.currentTime || 0;
+  if (loop.a != null && loop.b != null && t >= loop.b && !audio.paused) {
+    audio.currentTime = loop.a;
+    return;
+  }
+
+  // Fila y palabra actuales
+  const r = lastIndexLE(rowStarts, t + 0.05);
+  if (r !== curRow || force) {
+    if (rowEls[curRow]) rowEls[curRow].classList.remove("on");
+    if (tokEls[curRow] && tokEls[curRow][curTok]) tokEls[curRow][curTok].classList.remove("on");
+    const jumped = force || Math.abs(r - curRow) > 2;   // salto lejano: sin animación
+    curRow = r;
+    curTok = -1;
+    if (rowEls[r]) {
+      rowEls[r].classList.add("on");
+      if ($("#autoscroll").checked) ensureVisible(rowEls[r], !jumped);
+    }
+  }
+  if (r >= 0 && rows[r] && rows[r].type === "line") {
+    const k = lastIndexLE(rows[r].tokens.map((x) => (x.start == null ? Infinity : x.start)), t + 0.05);
+    if (k !== curTok) {
+      if (tokEls[r][curTok]) tokEls[r][curTok].classList.remove("on");
+      curTok = k;
+      if (tokEls[r][k]) tokEls[r][k].classList.add("on");
+    }
+  }
+
+  // Acorde actual
+  // 20 ms de tolerancia: el audio redondea currentTime y un salto exacto al inicio de un
+  // acorde puede caer unos microsegundos antes y mostrar el acorde anterior.
+  let ci = lastIndexLE(chords.map((c) => c.start), t + 0.02);
+  if (ci >= 0 && t >= chords[ci].end) ci = -1;
+  if (ci !== curChord) {
+    if (chordEls[curChord]) chordEls[curChord].classList.remove("on");
+    if (segEls[curChord]) segEls[curChord].classList.remove("on");
+    curChord = ci;
+    if (chordEls[ci]) chordEls[ci].classList.add("on");
+    if (segEls[ci]) segEls[ci].classList.add("on");
+    $("#curChord").textContent = ci >= 0 ? transpose(chords[ci].chord) : "–";
+    renderNow();
+    markActiveCard();
+  }
+
+  // Tiempo y cabezal
+  $("#time").textContent = fmt(t) + " / " + fmt(duration());
+  const head = $("#playhead");
+  if (head) head.style.left = (t / duration()) * 100 + "%";
+}
+
+// Temporizador en lugar de requestAnimationFrame: sigue funcionando con la pestaña
+// en segundo plano y es suficiente para resaltar palabras y acordes (~12 veces/s).
+function startTicker() {
+  setInterval(() => update(false), 80);
+}
+
+// ---------- Bucle A-B ----------
+function updateLoopRegion() {
+  const region = $("#loopRegion");
+  const on = loop.a != null && loop.b != null;
+  if (region) {
+    region.style.display = on ? "block" : "none";
+    if (on) {
+      region.style.left = (loop.a / duration()) * 100 + "%";
+      region.style.width = ((loop.b - loop.a) / duration()) * 100 + "%";
+    }
+  }
+  $("#loopA").classList.toggle("loop-on", loop.a != null);
+  $("#loopB").classList.toggle("loop-on", loop.b != null);
+  $("#loopClear").disabled = loop.a == null && loop.b == null;
+}
+$("#loopA").addEventListener("click", () => {
+  loop.a = audio.currentTime;
+  if (loop.b != null && loop.b <= loop.a) loop.b = null;
+  updateLoopRegion();
+});
+$("#loopB").addEventListener("click", () => {
+  if (loop.a == null || audio.currentTime <= loop.a) return;
+  loop.b = audio.currentTime;
+  updateLoopRegion();
+});
+$("#loopClear").addEventListener("click", () => { loop.a = loop.b = null; updateLoopRegion(); });
+
+// ---------- Controles ----------
+$("#play").addEventListener("click", togglePlay);
+$("#back5").addEventListener("click", () => seek(audio.currentTime - 5));
+$("#fwd5").addEventListener("click", () => seek(audio.currentTime + 5));
+audio.addEventListener("play", () => { $("#play").textContent = "⏸"; $("#play").setAttribute("aria-label", "Pausar"); });
+audio.addEventListener("pause", () => { $("#play").textContent = "▶"; $("#play").setAttribute("aria-label", "Reproducir"); });
+audio.addEventListener("loadedmetadata", () => { buildTimeline(); applySpeed(); });
+
+function applySpeed() {
+  const rate = parseFloat($("#speed").value) || 1;
+  audio.defaultPlaybackRate = rate;
+  audio.playbackRate = rate;
+  audio.preservesPitch = true;   // cambia el tempo sin cambiar el tono
+}
+$("#speed").addEventListener("change", applySpeed);
+
+$("#trUp").addEventListener("click", () => { shift = Math.min(shift + 1, 11); refreshChordLabels(); });
+$("#trDown").addEventListener("click", () => { shift = Math.max(shift - 1, -11); refreshChordLabels(); });
+$("#accToggle").addEventListener("click", () => { useFlats = !useFlats; savePref("useFlats", useFlats); refreshChordLabels(); });
+
+function applyFont() {
+  document.documentElement.style.setProperty("--fs", fontSize + "px");
+  savePref("fontSize", fontSize);
+}
+$("#fontUp").addEventListener("click", () => { fontSize = Math.min(fontSize + 2, 44); applyFont(); });
+$("#fontDown").addEventListener("click", () => { fontSize = Math.max(fontSize - 2, 14); applyFont(); });
+$("#autoscroll").addEventListener("change", (e) => savePref("autoscroll", e.target.checked));
+
+// Clic o arrastre en la línea de tiempo
+const tl = $("#timeline");
+function seekFromPointer(e) {
+  const rect = tl.getBoundingClientRect();
+  seek(((e.clientX - rect.left) / rect.width) * duration());
+}
+tl.addEventListener("pointerdown", (e) => { tl.setPointerCapture(e.pointerId); seekFromPointer(e); });
+tl.addEventListener("pointermove", (e) => { if (tl.hasPointerCapture(e.pointerId)) seekFromPointer(e); });
+
+document.addEventListener("keydown", (e) => {
+  if (e.target.closest("select, input, textarea, button")) return;
+  if (e.code === "Space") { e.preventDefault(); togglePlay(); }
+  else if (e.code === "ArrowLeft") { e.preventDefault(); seek(audio.currentTime - 5); }
+  else if (e.code === "ArrowRight") { e.preventDefault(); seek(audio.currentTime + 5); }
+});
+
+// ---------- Panel de diagramas ----------
+// Digitación (g) o inversión (p) elegida para cada acorde; se guarda en el navegador
+function choiceFor(name, kind) {
+  const c = choice[name];
+  return c && Number.isInteger(c[kind]) && c[kind] >= 0 ? c[kind] : 0;
+}
+function shiftChoice(name, kind, delta, total) {
+  const next = (((choiceFor(name, kind) + delta) % total) + total) % total;
+  choice[name] = { ...(choice[name] || {}), [kind]: next };
+  savePref("voicingChoice", choice);
+  refreshFigures(name, kind);
+}
+
+// Un diagrama con su selector ‹ n/total ›. kind: "g" guitarra, "p" piano.
+function figureFor(kind, name, info, big) {
+  const list = kind === "g" ? ChordDiagrams.voicings(info) : ChordDiagrams.pianoVoicings(info);
+  const fig = document.createElement("figure");
+  fig.className = "fig " + kind;
+  fig.dataset.name = name;
+  fig.dataset.kind = kind;
+  fig.dataset.big = big ? "1" : "";
+  if (!list.length) {
+    const none = document.createElement("span");
+    none.className = "nodgm";
+    none.textContent = "Sin digitación sencilla";
+    fig.append(none);
+    return fig;
+  }
+  const idx = choiceFor(name, kind) % list.length;
+  const item = list[idx];
+  fig.append(kind === "g"
+    ? ChordDiagrams.guitarSVG(item, info.rootPc, name)
+    : ChordDiagrams.pianoSVG(info, useFlats, idx));
+
+  const full = kind === "p" && idx > 0
+    ? `${item.label} · bajo ${ChordDiagrams.noteName(item.bassPc, useFlats)}`
+    : item.label;
+  const counter = `${idx + 1}/${list.length}`;
+  const label = document.createElement("span");
+  label.className = "vlabel";
+  label.textContent = big ? `${full} (${counter})` : counter;
+  label.title = full;
+
+  const bar = document.createElement("div");
+  bar.className = "vsel";
+  if (list.length > 1) {
+    const arrow = (text, aria, delta) => {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.textContent = text;
+      b.setAttribute("aria-label", aria + (kind === "g" ? " digitación" : " inversión"));
+      b.addEventListener("click", () => shiftChoice(name, kind, delta, list.length));
+      return b;
+    };
+    bar.append(arrow("‹", "Anterior", -1), label, arrow("›", "Siguiente", 1));
+  } else {
+    bar.append(label);
+  }
+  fig.append(bar);
+  return fig;
+}
+
+// Redibuja todos los diagramas de ese acorde (el grande y el de la cuadrícula)
+function refreshFigures(name, kind) {
+  const info = ChordDiagrams.parse(name);
+  document.querySelectorAll(`.fig[data-kind="${kind}"]`).forEach((old) => {
+    if (old.dataset.name === name) old.replaceWith(figureFor(kind, name, info, old.dataset.big === "1"));
+  });
+}
+
+function diagramsFor(name, big) {
+  const wrap = document.createElement("div");
+  wrap.className = "dgms";
+  const info = ChordDiagrams.parse(name);
+  if (!info) {
+    wrap.textContent = "Sin diagrama";
+    return wrap;
+  }
+  if (instrument !== "piano") wrap.append(figureFor("g", name, info, big));
+  if (instrument !== "guitar") wrap.append(figureFor("p", name, info, big));
+  return wrap;
+}
+
+function makeCard(name, big, withSeek) {
+  const card = document.createElement("div");
+  card.className = "card" + (big ? " big" : "");
+  const info = ChordDiagrams.parse(name);
+  const title = document.createElement("span");
+  title.className = "card-name";
+  title.textContent = name + (info && info.approx ? " ≈" : "");
+  if (info && info.approx) card.title = "Diagrama aproximado: no se reconoce la calidad del acorde";
+  let head = title;
+  if (withSeek) {            // el nombre es el botón que salta a ese acorde en la canción
+    head = document.createElement("button");
+    head.type = "button";
+    head.className = "card-seek";
+    head.title = "Ir a este acorde en la canción";
+    head.append(title);
+  }
+  card.append(head, diagramsFor(name, big));
+  return card;
+}
+
+let nowKey = "";
+function renderNow() {
+  if (!panelOpen) return;
+  const name = curChord >= 0 && chords[curChord] ? transpose(chords[curChord].chord) : "";
+  const key = [name, instrument, useFlats].join("|");
+  if (key === nowKey) return;
+  nowKey = key;
+  const box = $("#nowCard");
+  if (!name) {
+    const p = document.createElement("p");
+    p.className = "nodgm";
+    p.textContent = "Sin acorde en este momento";
+    box.replaceChildren(p);
+  } else {
+    box.replaceChildren(makeCard(name, true, false));
+  }
+}
+
+function renderGrid() {
+  const grid = $("#cardGrid");
+  grid.replaceChildren();
+  const stats = new Map();           // nombre mostrado -> duración total e índices
+  chords.forEach((c, i) => {
+    const name = transpose(c.chord);
+    const s = stats.get(name) || { name, dur: 0, idx: [] };
+    s.dur += c.end - c.start;
+    s.idx.push(i);
+    stats.set(name, s);
+  });
+  [...stats.values()].sort((a, b) => b.dur - a.dur).forEach((s) => {
+    const card = makeCard(s.name, false, true);
+    card.dataset.name = s.name;
+    card.querySelector(".card-seek").addEventListener("click", () => {      // salta a la próxima vez que suena
+      const now = audio.currentTime;
+      const next = s.idx.find((i) => chords[i].start > now + 0.2);
+      seek(chords[next !== undefined ? next : s.idx[0]].start);
+    });
+    grid.append(card);
+  });
+  nowKey = "";                        // fuerza redibujar el acorde actual
+  renderNow();
+  markActiveCard();
+}
+
+function markActiveCard() {
+  const name = curChord >= 0 && chords[curChord] ? transpose(chords[curChord].chord) : null;
+  document.querySelectorAll("#cardGrid .card").forEach((c) => c.classList.toggle("on", c.dataset.name === name));
+}
+
+function applyPanel() {
+  $("#app").classList.toggle("panel-open", panelOpen);
+  $("#panelToggle").setAttribute("aria-pressed", String(panelOpen));
+  document.querySelectorAll("#instr button").forEach((b) =>
+    b.setAttribute("aria-pressed", String(b.dataset.i === instrument)));
+  if (panelOpen) renderGrid();
+}
+function setPanel(open) {
+  panelOpen = open;
+  savePref("panelOpen", panelOpen);
+  applyPanel();
+}
+$("#panelToggle").addEventListener("click", () => setPanel(!panelOpen));
+$("#panelClose").addEventListener("click", () => setPanel(false));
+document.querySelectorAll("#instr button").forEach((b) =>
+  b.addEventListener("click", () => { instrument = b.dataset.i; savePref("instrument", instrument); applyPanel(); }));
+
+// ---------- Carga de canciones ----------
+async function loadSong(id) {
+  audio.pause();
+  loop.a = loop.b = null;
+  curRow = curTok = -1; curChord = -2;
+  const res = await fetch("/api/songs/" + encodeURIComponent(id));
+  if (!res.ok) { $("#sheet").textContent = "No se pudo cargar la canción."; return; }
+  const data = await res.json();
+  chords = data.chords || [];
+  rows = buildRows(data.lines || [], chords);
+  document.title = data.title + " · Visor de acordes";
+  renderSheet();
+  buildTimeline();
+  refreshChordLabels();
+  $("#main").scrollTop = 0;
+  if (data.audio) {
+    audio.src = data.audio;
+  } else {
+    audio.removeAttribute("src");
+    audio.load();
+  }
+  const url = new URL(location.href);
+  url.searchParams.set("song", id);
+  history.replaceState(null, "", url);
+  update(true);
+}
+
+async function init() {
+  applyFont();
+  applyPanel();
+  refreshChordLabels();
+  const res = await fetch("/api/songs");
+  const songs = res.ok ? await res.json() : [];
+  const select = $("#songSelect");
+  if (!songs.length) {
+    select.hidden = true;
+    $("#sheet").innerHTML = "";
+    const p = document.createElement("p");
+    p.className = "empty";
+    p.textContent = "Todavía no hay canciones. Procesa una con: python cli.py mi_cancion.mp3";
+    $("#sheet").append(p);
+    return;
+  }
+  songs.forEach((s) => {
+    const o = document.createElement("option");
+    o.value = s.id;
+    o.textContent = s.title;
+    select.append(o);
+  });
+  const wanted = new URL(location.href).searchParams.get("song");
+  if (wanted && songs.some((s) => s.id === wanted)) select.value = wanted;
+  select.addEventListener("change", () => loadSong(select.value));
+  await loadSong(select.value);
+  startTicker();
+}
+init();
+</script>
+</body>
+</html>
