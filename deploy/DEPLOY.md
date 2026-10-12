@@ -6,7 +6,7 @@ se sigue haciendo en tu PC; al servidor solo suben la app y los resultados de ca
 ```
 tu PC (GPU)                              VPS
 cli.py → songs/<cancion>/        push.ps1        /opt/transcriptor/app     (Dockerfile + web/)
-  audio, chords.json, ...      ─────────────►    /opt/transcriptor/songs   (sin stems/, solo lectura)
+  audio, chords.json, ...      ─────────────►    /opt/transcriptor/songs   (sin stems/ ni stems6/, solo lectura)
                                                  contenedor "viewer" ← proxy inverso con HTTPS
 ```
 
@@ -48,7 +48,8 @@ cd <carpeta-del-proyecto>
 ```
 
 Sube a `/opt/transcriptor/app` (Dockerfile, `docker-compose.yml`, `web/`) y a `/opt/transcriptor/songs`
-(canciones **sin** `stems/`, que pesan mucho y el visor no usa).
+(canciones **sin** `stems/` ni `stems6/`, las pistas separadas, que pesan cientos de MB y el visor no usa;
+sí se suben `notes.json` y `midi/`, necesarios para el piano roll).
 
 ## 3. Levantarlo en el servidor
 
@@ -113,4 +114,4 @@ curl -s -o /dev/null -w "%{http_code}\n" -u USUARIO:CONTRASEÑA https://visor.tu
 ## Qué NO va al servidor
 
 El código de procesamiento (`core/`, `cli.py`), los modelos (`third_party/`), el entorno `.venv`, las pistas
-separadas (`stems/`) y tu `.env` local. Están excluidos por `.dockerignore`, `.gitignore` y `push.ps1`.
+separadas (`stems/`, `stems6/`) y tu `.env` local. Están excluidos por `.dockerignore`, `.gitignore` y `push.ps1`.

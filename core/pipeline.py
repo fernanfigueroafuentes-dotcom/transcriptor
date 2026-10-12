@@ -7,6 +7,7 @@ from pathlib import Path
 from . import chords as chords_mod
 from . import lyrics as lyrics_mod
 from . import separate as separate_mod
+from .mix import prepare_mix
 from .merge import to_chordpro
 
 
@@ -53,6 +54,7 @@ def process(
     if separate:
         print("[1/4] Separando voz e instrumental (Demucs)...")
         vocals, instrumental = separate_mod.separate_vocals(audio, song_dir / "stems")
+        prepare_mix(song_dir)
     else:
         print("[1/4] Sin separación: se usa el audio completo.")
         vocals, instrumental = None, audio

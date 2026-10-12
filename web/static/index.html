@@ -51,6 +51,7 @@ button:focus-visible, select:focus-visible, input:focus-visible {
 #songSelect { min-width: 220px; max-width: 100%; font-weight: 600; }
 .val { min-width: 2.2em; text-align: center; font-variant-numeric: tabular-nums; }
 .toggle { display: flex; align-items: center; gap: 6px; }
+.fx-note { color: var(--muted); font-size: 12px; }
 
 /* Hoja de acordes */
 main { overflow-y: auto; padding: 20px 16px 80px; }
@@ -106,6 +107,85 @@ footer { background: var(--panel); border-top: 1px solid var(--line); padding: 1
   pointer-events: none; left: 0; }
 .hint { color: var(--muted); font-size: 12px; margin-top: 6px; }
 
+/* Mezclador de pistas */
+#mixer { display: none; border-bottom: 1px solid var(--line); padding: 0 0 10px; margin-bottom: 10px; }
+#mixer.open { display: block; }
+.mix-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin-bottom: 8px; }
+.mix-head strong { font-size: 14px; }
+#mixStatus { color: var(--muted); font-size: 12px; flex: 1; min-width: 12em; }
+#mixStatus.busy { color: var(--chord); }
+.mix-presets { display: flex; flex-wrap: wrap; gap: 6px; }
+.mix-presets button { font-size: 13px; padding: 4px 9px; }
+.strips { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px 10px; }
+.strip { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 4px 6px;
+  padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); }
+.strip.silent { opacity: .5; }
+.strip .name { font-size: 13px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.strip button { font: 700 12px/1 system-ui, sans-serif; width: 28px; height: 26px; padding: 0; }
+.strip button.m[aria-pressed="true"] { background: #c0392b; border-color: #c0392b; color: #fff; }
+.strip button.s[aria-pressed="true"] { background: #e0b100; border-color: #e0b100; color: #1d1d1f; }
+.strip input[type=range] { grid-column: 1 / -1; width: 100%; accent-color: var(--accent); margin: 0; }
+#mixToggle[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); font-weight: 700; }
+#mixToggle.active::after { content: " ●"; color: var(--accent); }
+@media (max-width: 560px) {
+  #mixer { max-height: 34dvh; overflow-y: auto; padding-bottom: 8px; margin-bottom: 8px; }
+  .mix-head { gap: 4px 8px; margin-bottom: 6px; }
+  .mix-head strong { display: none; }
+  .mix-presets { flex-wrap: nowrap; overflow-x: auto; width: 100%; }
+  .mix-presets button { flex: none; font-size: 12px; padding: 3px 8px; }
+  .strips { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; }
+  .strip { padding: 4px 5px; gap: 3px 3px; }
+  .strip .name { font-size: 11px; }
+  .strip button { width: 22px; height: 22px; font-size: 11px; }
+}
+
+/* Piano roll */
+#roll { display: none; grid-row: 2; grid-column: 1; flex-direction: column; min-height: 0; min-width: 0; background: var(--bg); }
+#app.roll-view main { display: none; }
+#app.roll-view #roll { display: flex; }
+.roll-bar {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; padding: 8px 14px;
+  background: var(--panel); border-bottom: 1px solid var(--line); font-size: 14px;
+}
+.roll-bar label.group { color: var(--muted); font-size: 13px; }
+.stem-chips { display: inline-flex; flex-wrap: wrap; gap: 6px 12px; }
+.stem-chip { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
+.stem-chip i { width: 11px; height: 11px; border-radius: 3px; display: inline-block; }
+a.btn {
+  font: inherit; color: var(--ink); background: var(--bg); border: 1px solid var(--line);
+  border-radius: 8px; padding: 6px 10px; text-decoration: none; cursor: pointer; white-space: nowrap;
+}
+a.btn:hover { border-color: var(--accent); }
+a.btn[aria-disabled="true"] { opacity: .45; pointer-events: none; }
+#rollWrap { position: relative; flex: 1; min-height: 160px; }
+#rollCanvas { position: absolute; inset: 0; width: 100%; height: 100%; cursor: crosshair; touch-action: none; }
+#rollEmpty {
+  position: absolute; inset: 0; margin: 0; display: flex; align-items: center; justify-content: center;
+  text-align: center; padding: 24px; color: var(--muted);
+}
+#rollToggle[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); font-weight: 700; }
+/* Rejilla y modo partitura */
+#roll .score-only { display: none; }
+#roll.mode-score .score-only { display: flex; }
+#roll.mode-score .roll-only { display: none; }
+#roll.mode-score #rollWrap { display: none; }
+#roll.mode-score { overflow-y: auto; }          /* en modo partitura se desplaza toda la vista */
+#scoreWrap { display: none; flex: none; flex-direction: column; }
+#roll.mode-score #scoreWrap { display: flex; }
+.grid-bar { background: var(--bg); gap: 6px 10px; }
+.grid-title { font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+.grid-bar input[type="number"] {
+  width: 5.4em; font: inherit; color: var(--ink); background: var(--panel);
+  border: 1px solid var(--line); border-radius: 8px; padding: 5px 6px;
+}
+.grid-bar button { padding: 4px 8px; font-size: 13px; }
+.grid-status { margin: 0; padding: 6px 14px; font-size: 13px; color: var(--muted); background: var(--panel); border-bottom: 1px solid var(--line); }
+.grid-status.good { color: var(--accent); }
+.grid-status.bad { color: var(--chord); }
+button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 700; }
+#scoreHint { margin: 0; padding: 10px 14px; color: var(--muted); font-size: 14px; }
+#scorePaper { background: #fff; color: #000; margin: 0 8px 12px; border-radius: 8px; padding: 8px; overflow-x: auto; flex: none; min-height: 420px; }
+
 /* Panel de diagramas */
 #panel {
   display: none; grid-row: 2; grid-column: 2; overflow-y: auto;
@@ -136,6 +216,10 @@ footer { background: var(--panel); border-top: 1px solid var(--line); padding: 1
 .card.big .card-name { font-size: 30px; }
 .dgms { display: flex; flex-wrap: wrap; gap: 6px 10px; justify-content: center; align-items: flex-end; width: 100%; }
 #cardGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+.dict { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 6px; }
+.dict select { flex: 1 1 120px; min-width: 0; }
+#dictRoot { flex: 0 0 76px; font-weight: 700; }
+#dictNotes { margin: 0 0 8px; color: var(--muted); font-size: 13px; }
 .nodgm { color: var(--muted); font-size: 12px; padding: 20px 4px; }
 svg.dgm { display: block; height: auto; }
 svg.guitar { width: 70px; }
@@ -206,12 +290,16 @@ figure.fig { margin: 0; display: flex; flex-direction: column; align-items: cent
       <span class="val" id="trVal">0</span>
       <button id="trUp" aria-label="Subir un semitono">+</button>
       <button id="accToggle" title="Alternar sostenidos y bemoles" aria-label="Alternar sostenidos y bemoles">♯</button>
+      <label class="toggle" title="Cambiar también el tono del audio, no solo el nombre de los acordes"><input type="checkbox" id="trAudio" checked> Audio</label>
+      <span id="fxNote" class="fx-note" role="status"></span>
     </div>
     <div class="group">
       <label for="speed">Velocidad</label>
       <select id="speed">
-        <option value="0.5">0.5×</option><option value="0.75">0.75×</option>
-        <option value="0.9">0.9×</option><option value="1" selected>1×</option>
+        <option value="0.5">0.5×</option><option value="0.6">0.6×</option>
+        <option value="0.7">0.7×</option><option value="0.75">0.75×</option>
+        <option value="0.8">0.8×</option><option value="0.9">0.9×</option>
+        <option value="1" selected>1×</option>
         <option value="1.1">1.1×</option><option value="1.25">1.25×</option>
       </select>
     </div>
@@ -222,9 +310,75 @@ figure.fig { margin: 0; display: flex; flex-direction: column; align-items: cent
     </div>
     <label class="toggle"><input type="checkbox" id="autoscroll" checked> Seguir la letra</label>
     <button id="panelToggle" aria-pressed="false" title="Diagramas de guitarra y piano">Diagramas</button>
+    <button id="rollToggle" aria-pressed="false" title="Notas transcritas de solos y arreglos: piano roll y partitura">Notas</button>
   </header>
 
   <main id="main"><div id="sheet"></div></main>
+
+  <section id="roll" aria-label="Notas transcritas">
+    <div class="roll-bar">
+      <div class="seg-ctl" id="viewMode" role="group" aria-label="Vista">
+        <button type="button" data-mode="roll" aria-pressed="true">Piano roll</button>
+        <button type="button" data-mode="score" aria-pressed="false">Partitura</button>
+      </div>
+      <span id="stemChips" class="stem-chips"></span>
+      <label class="group roll-only">Ventana
+        <select id="rollSpan">
+          <option value="8">8 s</option><option value="15">15 s</option>
+          <option value="30" selected>30 s</option><option value="60">60 s</option>
+        </select>
+      </label>
+      <label class="toggle roll-only"><input type="checkbox" id="rollLabels" checked> Nombres de nota</label>
+      <span class="spacer"></span>
+      <label class="group">MIDI de <select id="midiStem" aria-label="Pista para descargar"></select></label>
+      <a id="midiAll" class="btn" download aria-disabled="true" title="Notas con sus tiempos reales (tempo fijo de 120 bpm)">MIDI</a>
+      <a id="midiRegion" class="btn" download aria-disabled="true">MIDI del tramo A–B</a>
+    </div>
+
+    <div class="roll-bar grid-bar" aria-label="Rejilla rítmica">
+      <strong class="grid-title">Rejilla</strong>
+      <label class="group">Tempo <input id="gridBpm" type="number" min="30" max="300" step="0.1" value="120" aria-label="Tempo en pulsos por minuto"> bpm</label>
+      <button id="suggestBpm" type="button" title="Busca el tempo que mejor encaja con los ataques del tramo A–B">Sugerir</button>
+      <select id="bpmCandidates" aria-label="Tempos sugeridos" hidden></select>
+      <label class="group">Compás
+        <select id="gridMeter">
+          <option>4/4</option><option>3/4</option><option>2/4</option><option>6/8</option><option>12/8</option>
+        </select>
+      </label>
+      <label class="group">Divisiones
+        <select id="gridSubdiv">
+          <option value="2">corcheas</option><option value="4" selected>semicorcheas</option><option value="8">fusas</option>
+        </select>
+      </label>
+      <span class="group">Compás 1 en <strong id="gridOffset">–</strong>
+        <button id="offHere" type="button" title="Poner el primer tiempo donde está ahora el audio">Aquí</button>
+        <button id="offBeatMinus" type="button" title="Mover el compás 1 un pulso atrás">−1 pulso</button>
+        <button id="offBeatPlus" type="button" title="Mover el compás 1 un pulso adelante">+1 pulso</button>
+        <button id="offMinus" type="button">−10 ms</button>
+        <button id="offPlus" type="button">+10 ms</button>
+      </span>
+      <label class="toggle"><input type="checkbox" id="metronome"> Metrónomo</label>
+      <label class="toggle"><input type="checkbox" id="showGrid" checked> Ver rejilla</label>
+    </div>
+    <p id="gridStatus" class="grid-status">Marca A y B en el reproductor alrededor del pasaje y pulsa «Sugerir» para proponer un tempo.</p>
+
+    <div class="roll-bar score-only">
+      <label class="toggle"><input type="checkbox" id="gridTab" checked> Tablatura (guitarra y bajo)</label>
+      <button id="renderScore" type="button" class="primary">Generar partitura</button>
+      <a id="scoreXml" class="btn" download aria-disabled="true">MusicXML</a>
+      <label class="group">MIDI cuantizado de <select id="gridMidiStem" aria-label="Pista del MIDI cuantizado"></select></label>
+      <a id="scoreMidi" class="btn" download aria-disabled="true">Descargar</a>
+    </div>
+
+    <div id="rollWrap">
+      <canvas id="rollCanvas" aria-label="Piano roll: notas a lo largo del tiempo"></canvas>
+      <p id="rollEmpty" hidden></p>
+    </div>
+    <div id="scoreWrap">
+      <p id="scoreHint">Elige las pistas, confirma la rejilla y pulsa «Generar partitura».</p>
+      <div id="scorePaper"></div>
+    </div>
+  </section>
 
   <aside id="panel" aria-label="Diagramas de acordes">
     <div class="panel-head">
@@ -240,15 +394,31 @@ figure.fig { margin: 0; display: flex; flex-direction: column; align-items: cent
     <div id="nowCard"></div>
     <h2>Acordes de la canción</h2>
     <div id="cardGrid"></div>
+    <h2>Diccionario de acordes</h2>
+    <div class="dict">
+      <select id="dictRoot" aria-label="Nota raíz"></select>
+      <select id="dictQuality" aria-label="Tipo de acorde"></select>
+    </div>
+    <p id="dictNotes"></p>
+    <div id="dictCard"></div>
   </aside>
 
   <footer>
+    <div id="mixer" aria-label="Mezclador de pistas">
+      <div class="mix-head">
+        <strong>Mezclador</strong>
+        <span id="mixStatus" role="status">Escuchando la mezcla original.</span>
+        <span class="mix-presets" id="mixPresets"></span>
+      </div>
+      <div class="strips" id="mixStrips"></div>
+    </div>
     <div class="bar">
       <button id="play" aria-label="Reproducir">▶</button>
       <span id="curChord" aria-label="Acorde actual">–</span>
       <span id="time">0:00 / 0:00</span>
       <button id="back5" aria-label="Retroceder 5 segundos">−5 s</button>
       <button id="fwd5" aria-label="Adelantar 5 segundos">+5 s</button>
+      <button id="mixToggle" aria-pressed="false" title="Silenciar, aislar o bajar instrumentos" hidden>Mezcla</button>
       <span class="spacer"></span>
       <span class="group loop">
         <button id="loopA">Marcar A</button>
@@ -296,6 +466,15 @@ $("#autoscroll").checked = loadPref("autoscroll", true);
 let instrument = loadPref("instrument", "both");               // guitar | piano | both
 let panelOpen = loadPref("panelOpen", window.innerWidth >= 1000);
 let choice = loadPref("voicingChoice", {});                    // { "B": { g: 1, p: 0 } }
+let dict = loadPref("dict", { root: 0, quality: "maj7" });     // acorde del diccionario
+// Piano roll: pistas con notas, notas cargadas por pista, pistas visibles y vista actual
+let noteStems = [], notesByStem = {}, notesLoadedFor = null, enabledStems = new Set();
+let rollOpen = false, rollSpan = 30, rollRange = [48, 84], rollView = null, showNoteNames = true;
+// Rejilla rítmica que confirma el usuario: tempo fijo, instante del primer tiempo de un compás,
+// compás y divisiones por negra. offset == null significa "sin definir".
+let grid = { bpm: 120, offset: null, meter: "4/4", subdiv: 4 };
+let rollMode = "roll", showGridLines = true, audioCtx = null, lastClick = null;
+const metroLog = [];                  // últimos clics programados (sirve para comprobar el metrónomo)
 
 // ---------- Transposición ----------
 function transpose(name) {
@@ -315,7 +494,7 @@ function refreshChordLabels() {
   $("#trVal").textContent = (shift > 0 ? "+" : "") + shift;
   $("#accToggle").textContent = useFlats ? "♭" : "♯";
   curChord = -2; // fuerza refrescar el acorde grande
-  if (panelOpen) renderGrid();
+  if (panelOpen) { renderGrid(); renderDict(); }
 }
 
 // ---------- Construcción de filas (misma lógica que merge.py) ----------
@@ -468,7 +647,7 @@ function lastIndexLE(arr, t) {   // último índice con arr[i] <= t (-1 si ningu
 }
 
 function update(force) {
-  const t = audio.currentTime || 0;
+  const t = heardTime();
   if (loop.a != null && loop.b != null && t >= loop.b && !audio.paused) {
     audio.currentTime = loop.a;
     return;
@@ -516,6 +695,7 @@ function update(force) {
   $("#time").textContent = fmt(t) + " / " + fmt(duration());
   const head = $("#playhead");
   if (head) head.style.left = (t / duration()) * 100 + "%";
+  if (rollOpen) drawRoll();
 }
 
 // Temporizador en lugar de requestAnimationFrame: sigue funcionando con la pestaña
@@ -538,6 +718,8 @@ function updateLoopRegion() {
   $("#loopA").classList.toggle("loop-on", loop.a != null);
   $("#loopB").classList.toggle("loop-on", loop.b != null);
   $("#loopClear").disabled = loop.a == null && loop.b == null;
+  updateMidiLinks();
+  updateGridUI();
 }
 $("#loopA").addEventListener("click", () => {
   loop.a = audio.currentTime;
@@ -563,12 +745,14 @@ function applySpeed() {
   const rate = parseFloat($("#speed").value) || 1;
   audio.defaultPlaybackRate = rate;
   audio.playbackRate = rate;
-  audio.preservesPitch = true;   // cambia el tempo sin cambiar el tono
+  applyFx();                     // decide quién conserva el tono: el navegador o Signalsmith
 }
 $("#speed").addEventListener("change", applySpeed);
 
-$("#trUp").addEventListener("click", () => { shift = Math.min(shift + 1, 11); refreshChordLabels(); });
-$("#trDown").addEventListener("click", () => { shift = Math.max(shift - 1, -11); refreshChordLabels(); });
+$("#trUp").addEventListener("click", () => { shift = Math.min(shift + 1, 11); refreshChordLabels(); applyFx(); });
+$("#trDown").addEventListener("click", () => { shift = Math.max(shift - 1, -11); refreshChordLabels(); applyFx(); });
+$("#trAudio").checked = loadPref("trAudio", true);
+$("#trAudio").addEventListener("change", (e) => { savePref("trAudio", e.target.checked); applyFx(); });
 $("#accToggle").addEventListener("click", () => { useFlats = !useFlats; savePref("useFlats", useFlats); refreshChordLabels(); });
 
 function applyFont() {
@@ -747,13 +931,67 @@ function markActiveCard() {
   document.querySelectorAll("#cardGrid .card").forEach((c) => c.classList.toggle("on", c.dataset.name === name));
 }
 
+// Diccionario: cualquier acorde del catálogo (suspendidos, disminuidos, alterados, extensiones...)
+function fillDictQualities() {
+  const select = $("#dictQuality");
+  let group = null;
+  let optgroup = null;
+  ChordDiagrams.QUALITY_LIST.forEach((q) => {
+    if (q.group !== group) {
+      group = q.group;
+      optgroup = document.createElement("optgroup");
+      optgroup.label = group;
+      select.append(optgroup);
+    }
+    const o = document.createElement("option");
+    o.value = q.suffix;
+    o.textContent = q.suffix ? `${q.suffix} · ${q.label}` : q.label;
+    optgroup.append(o);
+  });
+  if (!ChordDiagrams.QUALITY_LIST.some((q) => q.suffix === dict.quality)) dict.quality = "maj7";
+  select.value = dict.quality;
+}
+
+function fillDictRoots() {         // los nombres cambian entre sostenidos y bemoles
+  const select = $("#dictRoot");
+  select.replaceChildren();
+  for (let pc = 0; pc < 12; pc++) {
+    const o = document.createElement("option");
+    o.value = String(pc);
+    o.textContent = ChordDiagrams.noteName(pc, useFlats);
+    select.append(o);
+  }
+  select.value = String(Number.isInteger(dict.root) ? dict.root % 12 : 0);
+}
+
+function renderDict() {
+  fillDictRoots();
+  const name = ChordDiagrams.noteName(dict.root, useFlats) + dict.quality;
+  const info = ChordDiagrams.parse(name);
+  $("#dictCard").replaceChildren(makeCard(name, true, false));
+  $("#dictNotes").textContent = info
+    ? "Notas: " + info.intervals.map((iv) => ChordDiagrams.noteName(dict.root + iv, useFlats)).join(" · ")
+    : "";
+}
+
 function applyPanel() {
   $("#app").classList.toggle("panel-open", panelOpen);
   $("#panelToggle").setAttribute("aria-pressed", String(panelOpen));
   document.querySelectorAll("#instr button").forEach((b) =>
     b.setAttribute("aria-pressed", String(b.dataset.i === instrument)));
-  if (panelOpen) renderGrid();
+  if (panelOpen) { renderGrid(); renderDict(); }
 }
+fillDictQualities();
+$("#dictRoot").addEventListener("change", (e) => {
+  dict.root = Number(e.target.value);
+  savePref("dict", dict);
+  renderDict();
+});
+$("#dictQuality").addEventListener("change", (e) => {
+  dict.quality = e.target.value;
+  savePref("dict", dict);
+  renderDict();
+});
 function setPanel(open) {
   panelOpen = open;
   savePref("panelOpen", panelOpen);
@@ -764,6 +1002,946 @@ $("#panelClose").addEventListener("click", () => setPanel(false));
 document.querySelectorAll("#instr button").forEach((b) =>
   b.addEventListener("click", () => { instrument = b.dataset.i; savePref("instrument", instrument); applyPanel(); }));
 
+// ---------- Piano roll de notas transcritas ----------
+const STEM_COLORS = { guitar: "#e8833a", piano: "#4ea1e0", bass: "#3fb883", other: "#b374e0", vocals: "#e6c35a" };
+const STEM_NAMES = { guitar: "Guitarra", piano: "Piano", bass: "Bajo", other: "Otros", vocals: "Voz" };
+const BLACK_PC = new Set([1, 3, 6, 8, 10]);
+const KEY_W = 46;                       // ancho de la tira de teclas, en píxeles
+
+function midiName(pitch) {              // 60 -> C4
+  return ChordDiagrams.noteName(pitch % 12, useFlats) + (Math.floor(pitch / 12) - 1);
+}
+
+function computeRollRange() {
+  const pitches = [];
+  for (const stem of enabledStems) for (const n of notesByStem[stem] || []) pitches.push(n[2]);
+  if (!pitches.length) { rollRange = [48, 84]; return; }
+  pitches.sort((a, b) => a - b);
+  const q = (p) => pitches[Math.min(pitches.length - 1, Math.max(0, Math.floor(p * (pitches.length - 1))))];
+  let lo = q(0.005) - 2;
+  let hi = q(0.995) + 2;
+  if (hi - lo < 24) { const mid = (lo + hi) / 2; lo = Math.floor(mid - 12); hi = Math.ceil(mid + 12); }
+  rollRange = [Math.max(0, lo), Math.min(127, hi)];
+}
+
+function renderRollBar() {
+  const chips = $("#stemChips");
+  chips.replaceChildren();
+  noteStems.forEach((stem) => {
+    const label = document.createElement("label");
+    label.className = "stem-chip";
+    const box = document.createElement("input");
+    box.type = "checkbox";
+    box.checked = enabledStems.has(stem);
+    box.addEventListener("change", () => {
+      if (box.checked) enabledStems.add(stem); else enabledStems.delete(stem);
+      computeRollRange();
+      drawRoll();
+    });
+    const swatch = document.createElement("i");
+    swatch.style.background = STEM_COLORS[stem] || "#888";
+    const count = (notesByStem[stem] || []).length;
+    label.append(box, swatch, document.createTextNode(`${STEM_NAMES[stem] || stem}${count ? ` (${count})` : ""}`));
+    chips.append(label);
+  });
+
+  for (const select of [$("#midiStem"), $("#gridMidiStem")]) {
+    const keep = select.value;
+    select.replaceChildren();
+    noteStems.forEach((stem) => {
+      const o = document.createElement("option");
+      o.value = stem;
+      o.textContent = STEM_NAMES[stem] || stem;
+      select.append(o);
+    });
+    if (noteStems.includes(keep)) select.value = keep;
+  }
+
+  const empty = $("#rollEmpty");
+  empty.hidden = noteStems.length > 0;
+  if (!noteStems.length) {
+    empty.textContent = "Esta canción aún no tiene notas transcritas. En tu equipo ejecuta: python transcribe_notes.py "
+      + ($("#songSelect").value || "<id-de-la-cancion>");
+  }
+  updateMidiLinks();
+  updateGridUI();
+}
+
+// Enlaces de descarga: la pista completa o solo el tramo A-B marcado en el reproductor
+function updateMidiLinks() {
+  const id = encodeURIComponent($("#songSelect").value || "");
+  const stem = $("#midiStem").value;
+  const has = noteStems.includes(stem);
+  const all = $("#midiAll");
+  const region = $("#midiRegion");
+  all.setAttribute("aria-disabled", String(!has));
+  all.href = has ? `/media/${id}/midi/${stem}.mid` : "#";
+  const hasRegion = loop.a != null && loop.b != null;
+  region.setAttribute("aria-disabled", String(!(has && hasRegion)));
+  region.href = has && hasRegion
+    ? `/media/${id}/midi/${stem}.mid?start=${loop.a.toFixed(2)}&end=${loop.b.toFixed(2)}`
+    : "#";
+  region.title = hasRegion
+    ? `Notas entre ${fmt(loop.a)} y ${fmt(loop.b)}`
+    : "Marca A y B en el reproductor para elegir el tramo (por ejemplo, un solo)";
+}
+
+async function ensureNotes() {
+  const id = $("#songSelect").value;
+  if (!id || notesLoadedFor === id) return;
+  notesLoadedFor = id;
+  notesByStem = {};
+  if (noteStems.length) {
+    const res = await fetch(`/api/songs/${encodeURIComponent(id)}/notes`);
+    if (res.ok) {
+      const data = await res.json();
+      for (const [stem, entry] of Object.entries(data.stems || {})) notesByStem[stem] = entry.notes;
+    }
+  }
+  if ($("#songSelect").value !== id) return;            // cambió de canción mientras cargaba
+  enabledStems = new Set(Object.keys(notesByStem));
+  computeRollRange();
+  renderRollBar();
+  drawRoll();
+}
+
+function drawRoll() {
+  if (!rollOpen) return;
+  const canvas = $("#rollCanvas");
+  const w = canvas.clientWidth;
+  const h = canvas.clientHeight;
+  if (!w || !h) return;
+  const dpr = window.devicePixelRatio || 1;
+  if (canvas.width !== Math.round(w * dpr) || canvas.height !== Math.round(h * dpr)) {
+    canvas.width = Math.round(w * dpr);
+    canvas.height = Math.round(h * dpr);
+  }
+  const ctx = canvas.getContext("2d");
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+  const css = getComputedStyle(document.documentElement);
+  const color = (name, fallback) => css.getPropertyValue(name).trim() || fallback;
+  const bg = color("--bg", "#fff"), ink = color("--ink", "#222"), muted = color("--muted", "#888");
+  const line = color("--line", "#ddd"), accent = color("--accent", "#0b6e4f");
+
+  const plotW = w - KEY_W;
+  const t = audio.currentTime || 0;
+  const t0 = t - rollSpan * 0.25;                       // el cabezal queda a un cuarto desde la izquierda
+  const t1 = t0 + rollSpan;
+
+  // Rango vertical: sigue a las notas de la ventana visible, con suavizado para que no salte
+  let want = [Infinity, -Infinity];
+  for (const stem of enabledStems) {
+    for (const [s, e, p] of notesByStem[stem] || []) {
+      if (e < t0 || s > t1) continue;
+      if (p < want[0]) want[0] = p;
+      if (p > want[1]) want[1] = p;
+    }
+  }
+  if (!isFinite(want[0])) want = [rollRange[0] + 2, rollRange[1] - 2];
+  want = [want[0] - 2, want[1] + 2];
+  if (want[1] - want[0] < 17) { const mid = (want[0] + want[1]) / 2; want = [mid - 8.5, mid + 8.5]; }
+  if (!rollView) rollView = want.slice();
+  else { rollView[0] += (want[0] - rollView[0]) * 0.3; rollView[1] += (want[1] - rollView[1]) * 0.3; }
+  const lo = Math.max(-0.5, rollView[0]);
+  const hi = Math.min(127.5, rollView[1]);
+  const rowH = h / (hi - lo + 1);
+  const xOf = (s) => KEY_W + ((s - t0) / rollSpan) * plotW;
+  const yOf = (p) => h - (p - lo + 1) * rowH;
+
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, w, h);
+
+  // Filas: las teclas negras más oscuras, línea en cada Do
+  for (let p = Math.floor(lo); p <= Math.ceil(hi); p++) {
+    if (BLACK_PC.has(p % 12)) {
+      ctx.fillStyle = "rgba(128,128,128,0.10)";
+      ctx.fillRect(KEY_W, yOf(p), plotW, rowH);
+    }
+    if (p % 12 === 0) {
+      ctx.fillStyle = line;
+      ctx.fillRect(KEY_W, yOf(p) + rowH - 1, plotW, 1);
+    }
+  }
+
+  // Cuadrícula de tiempo
+  const step = rollSpan <= 10 ? 1 : rollSpan <= 20 ? 2 : rollSpan <= 40 ? 5 : 10;
+  ctx.font = "11px system-ui, sans-serif";
+  ctx.textBaseline = "bottom";
+  for (let s = Math.ceil(Math.max(0, t0) / step) * step; s <= t1; s += step) {
+    const x = xOf(s);
+    ctx.fillStyle = line;
+    ctx.fillRect(x, 0, 1, h);
+    ctx.fillStyle = muted;
+    ctx.fillText(fmt(s), x + 3, h - 2);
+  }
+
+  // Tramo A-B
+  if (loop.a != null && loop.b != null) {
+    ctx.fillStyle = "rgba(79, 209, 161, 0.18)";
+    const xa = Math.max(KEY_W, xOf(loop.a));
+    const xb = Math.min(w, xOf(loop.b));
+    if (xb > xa) ctx.fillRect(xa, 0, xb - xa, h);
+  }
+
+  // Rejilla (pulsos y compases) cuando está definida; las divisiones solo con ventanas cortas
+  if (showGridLines && grid.offset != null) {
+    const period = 60 / grid.bpm;
+    const per = beatsPerBar();
+    for (let k = Math.ceil((t0 - grid.offset) / period); grid.offset + k * period <= t1; k++) {
+      const bar = (((k % per) + per) % per) === 0;
+      ctx.fillStyle = bar ? "rgba(79, 209, 161, 0.75)" : "rgba(79, 209, 161, 0.35)";
+      ctx.fillRect(xOf(grid.offset + k * period) - (bar ? 1 : 0), 0, bar ? 2 : 1, h);
+      if (rollSpan <= 15) {
+        ctx.fillStyle = "rgba(128, 128, 128, 0.18)";
+        for (let j = 1; j < grid.subdiv; j++) ctx.fillRect(xOf(grid.offset + (k + j / grid.subdiv) * period), 0, 1, h);
+      }
+    }
+  }
+
+  // Notas
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(KEY_W, 0, plotW, h);
+  ctx.clip();
+  ctx.textBaseline = "alphabetic";
+  for (const stem of enabledStems) {
+    const fill = STEM_COLORS[stem] || "#888";
+    for (const [s, e, p, v] of notesByStem[stem] || []) {
+      if (e < t0 || s > t1 || p < lo - 1 || p > hi + 1) continue;
+      const x = xOf(s);
+      const nw = Math.max(2, ((e - s) / rollSpan) * plotW);
+      const y = yOf(p);
+      const sounding = s <= t && t < e;
+      ctx.globalAlpha = sounding ? 1 : 0.5 + 0.4 * (v / 127);
+      ctx.fillStyle = fill;
+      ctx.fillRect(x, y + 0.5, nw, Math.max(2, rowH - 1));
+      if (sounding) {
+        ctx.globalAlpha = 1;
+        ctx.strokeStyle = ink;
+        ctx.lineWidth = 1.5;
+        ctx.strokeRect(x, y + 0.5, nw, Math.max(2, rowH - 1));
+      }
+      if (showNoteNames && rowH >= 11 && nw >= 26) {
+        ctx.globalAlpha = 1;
+        ctx.fillStyle = "#111";
+        ctx.fillText(midiName(p), x + 3, y + rowH - 3);
+      }
+    }
+  }
+  ctx.restore();
+  ctx.globalAlpha = 1;
+
+  // Tira de teclas a la izquierda
+  ctx.font = "10px system-ui, sans-serif";
+  for (let p = Math.floor(lo); p <= Math.ceil(hi); p++) {
+    const black = BLACK_PC.has(p % 12);
+    ctx.fillStyle = black ? "#222" : "#f4f4ef";
+    ctx.fillRect(0, yOf(p), KEY_W, rowH);
+    ctx.fillStyle = line;
+    ctx.fillRect(0, yOf(p) + rowH - 1, KEY_W, 1);
+    if (p % 12 === 0 || (rowH >= 13 && !black)) {
+      ctx.fillStyle = black ? "#fff" : "#333";
+      if (rowH >= 9) ctx.fillText(midiName(p), 4, yOf(p) + rowH - 2);
+    }
+  }
+
+  // Cabezal
+  ctx.fillStyle = accent;
+  ctx.fillRect(xOf(t) - 1, 0, 2, h);
+}
+
+function setRoll(open) {
+  rollOpen = open;
+  $("#app").classList.toggle("roll-view", open);
+  $("#rollToggle").setAttribute("aria-pressed", String(open));
+  if (open) { ensureNotes(); drawRoll(); }
+}
+$("#rollToggle").addEventListener("click", () => setRoll(!rollOpen));
+$("#rollSpan").addEventListener("change", (e) => { rollSpan = Number(e.target.value) || 30; drawRoll(); });
+$("#rollLabels").addEventListener("change", (e) => { showNoteNames = e.target.checked; drawRoll(); });
+$("#midiStem").addEventListener("change", updateMidiLinks);
+$("#rollCanvas").addEventListener("pointerdown", (e) => {   // clic en el roll: saltar a ese instante
+  const rect = e.currentTarget.getBoundingClientRect();
+  const x = e.clientX - rect.left;
+  if (x <= KEY_W) return;
+  seek(audio.currentTime - rollSpan * 0.25 + ((x - KEY_W) / (rect.width - KEY_W)) * rollSpan);
+});
+window.addEventListener("resize", () => drawRoll());
+
+// ---------- Rejilla rítmica, metrónomo y partitura ----------
+const MAX_REGION = 180;                 // segundos máximos de un tramo (igual que en el servidor)
+const KEY_MAJOR = { 0: "Do", 1: "Sol", 2: "Re", 3: "La", 4: "Mi", 5: "Si", 6: "Fa♯", 7: "Do♯",
+  "-1": "Fa", "-2": "Si♭", "-3": "Mi♭", "-4": "La♭", "-5": "Re♭", "-6": "Sol♭", "-7": "Do♭" };
+const KEY_MINOR = { 0: "La", 1: "Mi", 2: "Si", 3: "Fa♯", 4: "Do♯", 5: "Sol♯", 6: "Re♯", 7: "La♯",
+  "-1": "Re", "-2": "Sol", "-3": "Do", "-4": "Fa", "-5": "Si♭", "-6": "Mi♭", "-7": "La♭" };
+
+function beatsPerBar() {                // negras por compás: 4/4 -> 4, 3/4 -> 3, 6/8 -> 3
+  const [n, d] = grid.meter.split("/").map(Number);
+  return Math.max(1, Math.round((n * 4) / d));
+}
+
+// Tramo de trabajo: el A-B si está marcado; si no, 20 s desde donde está el audio
+function regionNow() {
+  if (loop.a != null && loop.b != null) return { start: loop.a, end: loop.b, explicit: true };
+  const s = Math.max(0, audio.currentTime || 0);
+  return { start: s, end: s + 20, explicit: false };
+}
+
+function regionOnsets(region) {         // instantes de ataque (s) de las pistas visibles en el tramo
+  const seen = new Set();
+  for (const stem of enabledStems) {
+    for (const n of notesByStem[stem] || []) {
+      if (n[0] >= region.start && n[0] < region.end) seen.add(Math.round(n[0] * 100) / 100);
+    }
+  }
+  return [...seen].sort((a, b) => a - b);
+}
+
+// Qué fracción de los ataques cae a ±30 ms de una línea de la rejilla, y cuánto saldría al azar
+function fitOf(onsets, bpm, offset, subdiv) {
+  const tol = 0.03;
+  const perSec = (bpm / 60) * subdiv;
+  let ok = 0;
+  for (const s of onsets) {
+    const x = (s - offset) * perSec;
+    if (Math.abs(x - Math.round(x)) / perSec <= tol) ok++;
+  }
+  return { n: onsets.length, fraction: onsets.length ? ok / onsets.length : 0, baseline: Math.min(1, 2 * tol * perSec) };
+}
+
+// Periodicidad de los ataques a un tempo dado (1 = perfectamente periódicos, ~0 = sin patrón)
+function tempoStrength(onsets, bpm) {
+  const period = 60 / bpm;
+  let c1 = 0, s1 = 0, c2 = 0, s2 = 0;
+  for (const t of onsets) {
+    const a = (2 * Math.PI * (t % period)) / period;
+    c1 += Math.cos(a); s1 += Math.sin(a);
+    c2 += Math.cos(2 * a); s2 += Math.sin(2 * a);
+  }
+  const n = onsets.length;
+  return Math.hypot(c1, s1) / n + 0.5 * (Math.hypot(c2, s2) / n);
+}
+
+function beatPhase(onsets, bpm) {       // segundos, dentro de un periodo, donde cae un pulso
+  const period = 60 / bpm;
+  let c = 0, s = 0;
+  for (const t of onsets) {
+    const a = (2 * Math.PI * (t % period)) / period;
+    c += Math.cos(a); s += Math.sin(a);
+  }
+  return ((Math.atan2(s, c) / (2 * Math.PI)) * period + period) % period;
+}
+
+function suggestTempos(onsets) {        // hasta 5 tempos candidatos, de mayor a menor periodicidad
+  const scan = [];
+  for (let bpm = 55; bpm <= 210; bpm += 0.2) scan.push([bpm, tempoStrength(onsets, bpm)]);
+  const peaks = [];
+  for (let i = 1; i < scan.length - 1; i++) {
+    if (scan[i][1] >= scan[i - 1][1] && scan[i][1] > scan[i + 1][1]) peaks.push(scan[i]);
+  }
+  peaks.sort((a, b) => b[1] - a[1]);
+  const picked = [];
+  for (const [bpm, strength] of peaks) {
+    if (picked.every((p) => Math.abs(p.bpm - bpm) / p.bpm > 0.03)) picked.push({ bpm: Math.round(bpm * 10) / 10, strength });
+    if (picked.length === 5) break;
+  }
+  return picked.map((p) => {
+    const phase = beatPhase(onsets, p.bpm);
+    return { ...p, phase, fit: fitOf(onsets, p.bpm, phase, grid.subdiv) };
+  });
+}
+
+function firstBeatFrom(phase, bpm, t) { // primer pulso de la rejilla en o después de t
+  const period = 60 / bpm;
+  return phase + Math.ceil((t - phase) / period - 1e-9) * period;
+}
+
+function fmtPrecise(t) {
+  const m = Math.floor(t / 60);
+  return m + ":" + (t - m * 60).toFixed(2).padStart(5, "0");
+}
+
+function gridParams() {
+  const r = regionNow();
+  return new URLSearchParams({
+    start: r.start.toFixed(3), end: r.end.toFixed(3), bpm: String(grid.bpm),
+    offset: grid.offset.toFixed(3), meter: grid.meter, subdiv: String(grid.subdiv),
+  });
+}
+function scoreParams(download) {
+  const p = gridParams();
+  p.set("stems", [...enabledStems].join(","));
+  p.set("tab", $("#gridTab").checked ? "1" : "0");
+  if (download) p.set("download", "1");
+  return p;
+}
+
+function updateGridUI() {
+  $("#gridBpm").value = grid.bpm;
+  $("#gridMeter").value = grid.meter;
+  $("#gridSubdiv").value = String(grid.subdiv);
+  $("#gridOffset").textContent = grid.offset == null ? "–" : fmtPrecise(grid.offset);
+
+  const status = $("#gridStatus");
+  status.className = "grid-status";
+  const r = regionNow();
+  const tooLong = r.end - r.start > MAX_REGION;
+  if (!noteStems.length) {
+    status.textContent = "Esta canción aún no tiene notas transcritas.";
+  } else if (grid.offset == null) {
+    status.textContent = "Marca A y B en el reproductor alrededor del pasaje y pulsa «Sugerir» para proponer un tempo, o fija el primer tiempo con «Aquí».";
+  } else {
+    const f = fitOf(regionOnsets(r), grid.bpm, grid.offset, grid.subdiv);
+    const pct = Math.round(f.fraction * 100);
+    const base = Math.round(f.baseline * 100);
+    let text = `Ajuste de la rejilla: ${pct} % de los ${f.n} ataques cae a ±30 ms de una línea (al azar saldría ≈ ${base} %).`;
+    if (f.n < 10) {
+      text += " Hay muy pocos ataques para valorarlo.";
+    } else if (f.fraction - f.baseline >= 0.2) {
+      status.classList.add("good");
+    } else if (f.fraction - f.baseline < 0.08) {
+      status.classList.add("bad");
+      text += " Apenas mejora al azar: prueba otro tempo, mueve el compás 1 o escúchalo con el metrónomo.";
+    }
+    if (!r.explicit) text += " Sin A–B se usan 20 s desde la posición actual.";
+    if (tooLong) text += ` El tramo supera ${MAX_REGION} s.`;
+    status.textContent = text;
+  }
+
+  const ready = grid.offset != null && !tooLong && noteStems.length > 0;
+  const id = encodeURIComponent($("#songSelect").value || "");
+  const xml = $("#scoreXml");
+  const midi = $("#scoreMidi");
+  const stem = $("#gridMidiStem").value;
+  const xmlOk = ready && enabledStems.size > 0;
+  const midiOk = ready && noteStems.includes(stem);
+  xml.setAttribute("aria-disabled", String(!xmlOk));
+  xml.href = xmlOk ? `/media/${id}/score.musicxml?${scoreParams(true)}` : "#";
+  midi.setAttribute("aria-disabled", String(!midiOk));
+  midi.href = midiOk ? `/media/${id}/grid/${stem}.mid?${gridParams()}` : "#";
+  if (rollOpen) drawRoll();
+}
+
+function setOffset(value) {
+  grid.offset = value;
+  updateGridUI();
+}
+
+$("#gridBpm").addEventListener("change", (e) => {
+  const v = parseFloat(e.target.value);
+  grid.bpm = v >= 30 && v <= 300 ? Math.round(v * 10) / 10 : grid.bpm;
+  updateGridUI();
+});
+$("#gridMeter").addEventListener("change", (e) => { grid.meter = e.target.value; updateGridUI(); });
+$("#gridSubdiv").addEventListener("change", (e) => { grid.subdiv = Number(e.target.value); updateGridUI(); });
+$("#gridMidiStem").addEventListener("change", updateGridUI);
+$("#gridTab").addEventListener("change", updateGridUI);
+$("#showGrid").addEventListener("change", (e) => { showGridLines = e.target.checked; drawRoll(); });
+$("#offHere").addEventListener("click", () => setOffset(audio.currentTime || 0));
+$("#offBeatMinus").addEventListener("click", () => setOffset((grid.offset ?? (audio.currentTime || 0)) - 60 / grid.bpm));
+$("#offBeatPlus").addEventListener("click", () => setOffset((grid.offset ?? (audio.currentTime || 0)) + 60 / grid.bpm));
+$("#offMinus").addEventListener("click", () => setOffset((grid.offset ?? (audio.currentTime || 0)) - 0.01));
+$("#offPlus").addEventListener("click", () => setOffset((grid.offset ?? (audio.currentTime || 0)) + 0.01));
+
+let tempoCandidates = [];
+function applyCandidate(c, region) {
+  grid.bpm = c.bpm;
+  grid.offset = firstBeatFrom(c.phase, c.bpm, region.start);
+  updateGridUI();
+}
+$("#suggestBpm").addEventListener("click", () => {
+  const region = regionNow();
+  const onsets = regionOnsets(region);
+  const select = $("#bpmCandidates");
+  if (onsets.length < 20) {
+    select.hidden = true;
+    const status = $("#gridStatus");
+    status.className = "grid-status bad";
+    status.textContent = `Solo hay ${onsets.length} ataques en el tramo: marca un A–B más largo o activa más pistas.`;
+    return;
+  }
+  tempoCandidates = suggestTempos(onsets);
+  select.replaceChildren();
+  tempoCandidates.forEach((c, i) => {
+    const o = document.createElement("option");
+    o.value = String(i);
+    o.textContent = `${c.bpm.toFixed(1)} bpm · ajuste ${Math.round(c.fit.fraction * 100)} % (azar ${Math.round(c.fit.baseline * 100)} %)`;
+    select.append(o);
+  });
+  select.hidden = false;
+  applyCandidate(tempoCandidates[0], region);
+});
+$("#bpmCandidates").addEventListener("change", (e) => applyCandidate(tempoCandidates[Number(e.target.value)], regionNow()));
+
+// Metrónomo: programa clics de WebAudio sobre los pulsos de la rejilla mientras suena el audio
+function ensureAudioCtx() {
+  if (!audioCtx) {
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    if (Ctx) audioCtx = new Ctx();
+  }
+  if (audioCtx && audioCtx.state === "suspended") audioCtx.resume();
+  return audioCtx;
+}
+function click(accent, delay) {
+  const ctx = audioCtx;
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  const t = ctx.currentTime + Math.max(0, delay);
+  osc.frequency.value = accent ? 1500 : 1000;
+  gain.gain.setValueAtTime(0.0001, t);
+  gain.gain.exponentialRampToValueAtTime(0.35, t + 0.002);
+  gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.05);
+  osc.connect(gain).connect(ctx.destination);
+  osc.start(t);
+  osc.stop(t + 0.06);
+}
+function metronomeTick() {
+  if (!$("#metronome").checked || audio.paused || grid.offset == null || !audioCtx) return;
+  const period = 60 / grid.bpm;
+  const rate = audio.playbackRate || 1;
+  const t = heardTime();
+  const horizon = 0.15 * rate;
+  const per = beatsPerBar();
+  let k = Math.ceil((t - grid.offset) / period - 1e-9);
+  if (lastClick != null && k <= lastClick) k = lastClick + 1;
+  while (grid.offset + k * period < t + horizon) {
+    const beatTime = grid.offset + k * period;
+    const accent = (((k % per) + per) % per) === 0;
+    click(accent, (beatTime - t) / rate);
+    metroLog.push({ beat: k, accent, at: beatTime });
+    if (metroLog.length > 60) metroLog.shift();
+    lastClick = k;
+    k++;
+  }
+}
+$("#metronome").addEventListener("change", (e) => { if (e.target.checked) ensureAudioCtx(); lastClick = null; });
+audio.addEventListener("seeking", () => { lastClick = null; });
+audio.addEventListener("pause", () => { lastClick = null; });
+setInterval(metronomeTick, 25);
+
+// Vista: piano roll o partitura
+function setMode(mode) {
+  rollMode = mode;
+  $("#roll").classList.toggle("mode-score", mode === "score");
+  document.querySelectorAll("#viewMode button").forEach((b) =>
+    b.setAttribute("aria-pressed", String(b.dataset.mode === mode)));
+  if (mode === "roll") drawRoll();
+}
+document.querySelectorAll("#viewMode button").forEach((b) => b.addEventListener("click", () => setMode(b.dataset.mode)));
+
+async function ensureOsmd() {           // la biblioteca de partituras se carga solo cuando hace falta
+  if (window.opensheetmusicdisplay) return;
+  await new Promise((resolve, reject) => {
+    const s = document.createElement("script");
+    s.src = "/vendor/opensheetmusicdisplay.min.js";
+    s.onload = resolve;
+    s.onerror = () => reject(new Error("no se pudo cargar la biblioteca de partituras"));
+    document.head.append(s);
+  });
+}
+
+let scoreBusy = false;
+async function renderScore() {
+  if (scoreBusy) return;
+  const hint = $("#scoreHint");
+  const r = regionNow();
+  if (grid.offset == null) { hint.textContent = "Primero define la rejilla: pulsa «Sugerir» o «Aquí» para fijar el primer tiempo."; return; }
+  if (!enabledStems.size) { hint.textContent = "Marca al menos una pista."; return; }
+  if (r.end - r.start > MAX_REGION) { hint.textContent = `El tramo no puede durar más de ${MAX_REGION} s.`; return; }
+  scoreBusy = true;
+  hint.textContent = "Generando partitura…";
+  try {
+    const id = encodeURIComponent($("#songSelect").value);
+    const res = await fetch(`/media/${id}/score.musicxml?${scoreParams(false)}`);
+    if (!res.ok) {
+      let msg = res.statusText;
+      try { msg = (await res.json()).detail || msg; } catch { /* sin cuerpo JSON */ }
+      hint.textContent = "No se pudo generar: " + msg;
+      return;
+    }
+    const xml = await res.text();
+    const h = res.headers;
+    const [fifths, mode] = (h.get("x-score-key") || "0:major").split(":");
+    await ensureOsmd();
+    const paper = $("#scorePaper");
+    paper.replaceChildren();
+    const osmd = new opensheetmusicdisplay.OpenSheetMusicDisplay(paper, {
+      autoResize: false, backend: "svg", drawTitle: true, drawPartNames: true, autoBeam: true,
+    });
+    await osmd.load(xml);
+    osmd.render();
+    const fit = Math.round(parseFloat(h.get("x-score-fit")) * 100);
+    const base = Math.round(parseFloat(h.get("x-score-baseline")) * 100);
+    const names = mode === "minor" ? KEY_MINOR : KEY_MAJOR;
+    let text = `${h.get("x-score-bars")} compases · tonalidad estimada: ${names[fifths] || "?"} ${mode === "minor" ? "menor" : "mayor"} · ajuste ${fit} % (azar ≈ ${base} %)`;
+    if (Number(h.get("x-score-dropped"))) text += ` · ${h.get("x-score-dropped")} notas descartadas por exceso de voces`;
+    if (Number(h.get("x-score-clamped"))) text += ` · ${h.get("x-score-clamped")} notas llevadas a una octava tocable`;
+    hint.textContent = text;
+  } catch (err) {
+    hint.textContent = "No se pudo mostrar la partitura: " + ((err && err.message) || err);
+  } finally {
+    scoreBusy = false;
+  }
+}
+$("#renderScore").addEventListener("click", renderScore);
+
+// ---------- Tono y velocidad del audio (Signalsmith Stretch) ----------
+// Sin cambios, el audio suena tal cual. Al transponer o cambiar la velocidad, todas las fuentes
+// (audio original y pistas del mezclador) pasan por WebAudio: cada <audio> se acelera o frena sin
+// conservar el tono (remuestreo limpio) y un único nodo Signalsmith Stretch corrige el tono y aplica
+// la transposición. Suena bastante mejor que el estirado del navegador, sobre todo a 0.5–0.75×.
+const fx = { node: null, loading: null, failed: false, routes: new Map(), gains: new Map(), on: false, latency: 0 };
+
+function audioSemitones() {               // la transposición del audio, al intervalo más cercano (−5…+6)
+  if (!$("#trAudio").checked) return 0;
+  return ((shift % 12) + 12 + 5) % 12 - 5;
+}
+
+// Volumen de un <audio>: con WebAudio va en su GainNode; sin él, en el propio elemento
+function setElGain(el, g) {
+  fx.gains.set(el, g);
+  const r = fx.routes.get(el);
+  if (r) {
+    el.volume = 1;
+    el.muted = false;
+    r.gain.gain.value = g;
+  } else {
+    el.volume = Math.max(0, Math.min(1, g));
+    el.muted = g === 0;                   // en iOS el volumen es de solo lectura; silenciar sí funciona
+  }
+}
+
+function routeEl(el) {                    // permanente: un <audio> conectado a WebAudio ya no suena solo
+  let r = fx.routes.get(el);
+  if (r) return r;
+  const src = audioCtx.createMediaElementSource(el);
+  const gain = audioCtx.createGain();
+  src.connect(gain);
+  r = { src, gain, target: null };
+  fx.routes.set(el, r);
+  setElGain(el, fx.gains.has(el) ? fx.gains.get(el) : (el.muted ? 0 : el.volume));
+  return r;
+}
+
+function connectRoute(r, target) {
+  if (r.target === target) return;
+  if (r.target) r.gain.disconnect();
+  r.gain.connect(target);
+  r.target = target;
+}
+
+function fxForget(el) {                   // al cambiar de canción, las pistas viejas se sueltan
+  const r = fx.routes.get(el);
+  if (r) { r.gain.disconnect(); r.src.disconnect(); fx.routes.delete(el); }
+  fx.gains.delete(el);
+}
+
+function fxAttach(el) {                   // una pista nueva se suma a la ruta que esté en uso
+  if (!fx.routes.size || !audioCtx) return;
+  connectRoute(routeEl(el), fx.on ? fx.node : audioCtx.destination);
+  el.preservesPitch = !fx.on;
+}
+
+async function ensureFx() {
+  if (fx.node || fx.failed) return fx.node;
+  if (!fx.loading) {
+    fx.loading = (async () => {
+      const ctx = ensureAudioCtx();
+      if (!ctx || !ctx.audioWorklet) throw new Error("este navegador no admite AudioWorklet");
+      if (!window.SignalsmithStretch) {
+        await new Promise((resolve, reject) => {
+          const s = document.createElement("script");
+          s.src = "/vendor/signalsmith-stretch.js";
+          s.onload = resolve;
+          s.onerror = () => reject(new Error("no se pudo cargar el procesador de tono"));
+          document.head.append(s);
+        });
+      }
+      const node = await window.SignalsmithStretch(ctx);
+      node.connect(ctx.destination);
+      await node.start();
+      try { fx.latency = await node.latency(); } catch { fx.latency = 0.12; }
+      fx.node = node;
+      return node;
+    })().catch((err) => {
+      fx.failed = true;
+      console.warn("Tono del audio:", err);
+      return null;
+    });
+  }
+  return fx.loading;
+}
+
+let fxQueue = Promise.resolve();
+function applyFx() {                      // en cola: los clics rápidos en ± no se pisan
+  fxQueue = fxQueue.then(applyFxNow, applyFxNow);
+  return fxQueue;
+}
+
+async function applyFxNow() {
+  const rate = parseFloat($("#speed").value) || 1;
+  const semis = audioSemitones();
+  const need = semis !== 0 || Math.abs(rate - 1) > 1e-6;
+  if (need && !fx.node && !fx.failed) $("#fxNote").textContent = "cargando…";
+  const node = need ? await ensureFx() : fx.node;
+  const els = [audio, ...Object.values(mixer.els)];
+  if (need && node) {
+    if (audioCtx.state === "suspended") audioCtx.resume();
+    els.forEach((el) => { connectRoute(routeEl(el), node); el.preservesPitch = false; });
+    node.schedule({ active: true, semitones: semis - 12 * Math.log2(rate) });
+    fx.on = true;
+  } else {
+    // neutro, o el navegador no lo admite: directo al altavoz y, si hay velocidad, la estira el navegador
+    els.forEach((el) => {
+      const r = fx.routes.get(el);
+      if (r) connectRoute(r, audioCtx.destination);
+      el.preservesPitch = true;
+    });
+    if (node) node.schedule({ active: false });
+    fx.on = false;
+  }
+  const note = $("#fxNote");
+  if (need && !node) {
+    note.textContent = semis ? "el tono del audio no se puede cambiar en este navegador" : "";
+  } else {
+    note.textContent = "";
+  }
+}
+
+// Con las fuentes en WebAudio, un contexto suspendido (pestaña en segundo plano, móvil) dejaría mudo el audio
+audio.addEventListener("play", () => {
+  if (fx.routes.size && audioCtx && audioCtx.state !== "running") audioCtx.resume();
+});
+
+// Lo que se está oyendo ahora: con el procesador activo, el sonido llega con su latencia de retraso
+function heardTime() {
+  const t = audio.currentTime || 0;
+  return fx.on ? Math.max(0, t - fx.latency * (audio.playbackRate || 1)) : t;
+}
+
+// ---------- Mezclador de pistas ----------
+// Las pistas separadas suenan en <audio> propios que siguen al reproductor principal, que sigue
+// mandando (tiempo, bucle, velocidad). Con la mezcla en su punto neutro se escucha el audio
+// original; en cuanto se silencia, aísla o baja una pista, el original se calla y suenan las
+// pistas. Se descargan solo la primera vez que se usan.
+const mixer = { songId: null, stems: [], els: {}, state: {}, active: false, pendingPlay: false };
+const MIX_PRESETS = [
+  { label: "Original", fn: () => ({}) },
+  { label: "Sin voz", needs: "vocals", fn: () => ({ vocals: { mute: true } }) },
+  { label: "Sin guitarra", needs: "guitar", fn: () => ({ guitar: { mute: true } }) },
+  { label: "Sin bajo", needs: "bass", fn: () => ({ bass: { mute: true } }) },
+  { label: "Solo voz", needs: "vocals", fn: () => ({ vocals: { solo: true } }) },
+];
+const defaultStem = () => ({ vol: 1, mute: false, solo: false });
+const isNeutral = (s) => s.vol === 1 && !s.mute && !s.solo;
+
+function audibleGain(id) {
+  const s = mixer.state[id];
+  const anySolo = mixer.stems.some((x) => mixer.state[x.id].solo);
+  if (s.mute || (anySolo && !s.solo)) return 0;
+  return s.vol;
+}
+
+function setupMixer(data) {
+  Object.values(mixer.els).forEach((el) => { el.pause(); fxForget(el); el.removeAttribute("src"); el.load(); });
+  mixer.songId = data.id;
+  mixer.stems = data.mix || [];
+  mixer.els = {};
+  mixer.pendingPlay = false;
+  mixer.active = false;
+  const saved = loadPref("mix:" + data.id, {});
+  mixer.state = {};
+  mixer.stems.forEach((s) => { mixer.state[s.id] = Object.assign(defaultStem(), saved[s.id] || {}); });
+  $("#mixToggle").hidden = !mixer.stems.length;
+  if (!mixer.stems.length) {
+    $("#mixer").classList.remove("open");
+    $("#mixToggle").setAttribute("aria-pressed", "false");
+  }
+  renderMixer();
+  applyMix();
+}
+
+function renderMixer() {
+  const strips = $("#mixStrips");
+  strips.replaceChildren();
+  mixer.stems.forEach((stem) => {
+    const box = document.createElement("div");
+    box.className = "strip";
+    box.dataset.stem = stem.id;
+    const name = document.createElement("span");
+    name.className = "name";
+    name.textContent = stem.label;
+    const mute = document.createElement("button");
+    mute.className = "m"; mute.textContent = "M"; mute.title = "Silenciar " + stem.label;
+    mute.setAttribute("aria-label", "Silenciar " + stem.label);
+    mute.addEventListener("click", () => { const s = mixer.state[stem.id]; s.mute = !s.mute; mixChanged(); });
+    const solo = document.createElement("button");
+    solo.className = "s"; solo.textContent = "S"; solo.title = "Escuchar solo " + stem.label;
+    solo.setAttribute("aria-label", "Escuchar solo " + stem.label);
+    solo.addEventListener("click", () => { const s = mixer.state[stem.id]; s.solo = !s.solo; mixChanged(); });
+    const vol = document.createElement("input");
+    vol.type = "range"; vol.min = "0"; vol.max = "100"; vol.step = "1";
+    vol.setAttribute("aria-label", "Volumen de " + stem.label);
+    vol.addEventListener("input", () => { mixer.state[stem.id].vol = Number(vol.value) / 100; mixChanged(); });
+    vol.addEventListener("dblclick", () => { mixer.state[stem.id].vol = 1; mixChanged(); });
+    box.append(name, mute, solo, vol);
+    strips.append(box);
+  });
+  const presets = $("#mixPresets");
+  presets.replaceChildren();
+  const ids = new Set(mixer.stems.map((s) => s.id));
+  MIX_PRESETS.filter((p) => !p.needs || ids.has(p.needs)).forEach((p) => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.textContent = p.label;
+    b.addEventListener("click", () => {
+      const over = p.fn();
+      mixer.stems.forEach((s) => { mixer.state[s.id] = Object.assign(defaultStem(), over[s.id] || {}); });
+      mixChanged();
+    });
+    presets.append(b);
+  });
+  refreshStrips();
+}
+
+function refreshStrips() {
+  $("#mixStrips").querySelectorAll(".strip").forEach((box) => {
+    const s = mixer.state[box.dataset.stem];
+    box.querySelector(".m").setAttribute("aria-pressed", String(s.mute));
+    box.querySelector(".s").setAttribute("aria-pressed", String(s.solo));
+    box.querySelector("input").value = String(Math.round(s.vol * 100));
+    box.classList.toggle("silent", mixer.active && audibleGain(box.dataset.stem) === 0);
+  });
+}
+
+function mixChanged() {
+  savePref("mix:" + mixer.songId, mixer.state);
+  applyMix();
+  refreshStrips();
+}
+
+function ensureStemEls() {
+  mixer.stems.forEach((stem) => {
+    if (mixer.els[stem.id]) return;
+    const el = new Audio();
+    el.preload = "auto";
+    el.preservesPitch = true;
+    el.src = stem.url;
+    el.addEventListener("canplay", () => { mixStatus(); resumeIfReady(); });
+    el.addEventListener("waiting", mixStatus);
+    el.addEventListener("error", mixStatus);
+    mixer.els[stem.id] = el;
+    fxAttach(el);
+  });
+}
+
+const stemsReady = () => mixer.stems.every((s) => mixer.els[s.id] && mixer.els[s.id].readyState >= 3);
+
+function mixStatus() {
+  const st = $("#mixStatus");
+  if (!mixer.active) {
+    st.textContent = "Escuchando la mezcla original. Silencia (M), aísla (S) o baja una pista para practicar.";
+    st.classList.remove("busy");
+    return;
+  }
+  const failed = mixer.stems.filter((s) => mixer.els[s.id] && mixer.els[s.id].error);
+  const ready = mixer.stems.filter((s) => mixer.els[s.id] && mixer.els[s.id].readyState >= 3).length;
+  if (failed.length) {
+    st.textContent = "No se pudo cargar: " + failed.map((s) => s.label).join(", ");
+    st.classList.add("busy");
+  } else if (ready < mixer.stems.length) {
+    st.textContent = `Cargando pistas… ${ready}/${mixer.stems.length}`;
+    st.classList.add("busy");
+  } else {
+    st.textContent = `Escuchando ${mixer.stems.length} pistas separadas. Doble clic en un volumen lo deja al 100 %.`;
+    st.classList.remove("busy");
+  }
+}
+
+function applyMix() {
+  const active = mixer.stems.length > 0 && mixer.stems.some((s) => !isNeutral(mixer.state[s.id]));
+  const wasActive = mixer.active;
+  mixer.active = active;
+  $("#mixToggle").classList.toggle("active", active);
+  if (active) {
+    ensureStemEls();
+    mixer.stems.forEach((s) => {
+      const el = mixer.els[s.id];
+      setElGain(el, audibleGain(s.id));
+    });
+    setElGain(audio, 0);
+    if (!wasActive) {
+      syncStems(true);
+      if (!audio.paused && !stemsReady()) { mixer.pendingPlay = true; audio.pause(); }
+    }
+  } else {
+    setElGain(audio, 1);
+    mixer.pendingPlay = false;
+    Object.values(mixer.els).forEach((el) => el.pause());
+  }
+  mixStatus();
+}
+
+// Mantiene las pistas pegadas al reproductor principal
+function syncStems(hard) {
+  if (!mixer.active) return;
+  const t = audio.currentTime || 0;
+  const rate = audio.playbackRate || 1;
+  for (const s of mixer.stems) {
+    const el = mixer.els[s.id];
+    if (!el) continue;
+    if (audio.paused) {
+      if (!el.paused) el.pause();
+      if (hard || Math.abs(el.currentTime - t) > 0.03) el.currentTime = t;
+      el.playbackRate = rate;
+      continue;
+    }
+    const drift = el.currentTime - t;
+    if (hard || Math.abs(drift) > 0.25) {
+      el.currentTime = t;
+      el.playbackRate = rate;
+    } else if (Math.abs(drift) > 0.04) {
+      // corrección suave: acelera o frena un poco hasta alcanzar al principal
+      // (con el procesador de tono activo, el elemento no conserva el tono: corrección mínima)
+      const maxCorr = fx.on ? 0.004 : 0.03;
+      el.playbackRate = rate * (1 - Math.max(-maxCorr, Math.min(maxCorr, drift * 0.5)));
+    } else if (Math.abs(drift) < 0.01 && el.playbackRate !== rate) {
+      el.playbackRate = rate;
+    }
+    if (el.paused && el.readyState >= 2) el.play().catch(() => {});
+  }
+}
+
+function resumeIfReady() {
+  if (mixer.pendingPlay && stemsReady()) {
+    mixer.pendingPlay = false;
+    audio.play().catch(() => {});
+  }
+}
+
+audio.addEventListener("play", () => {
+  if (!mixer.active) return;
+  if (!stemsReady()) {                 // espera a que todas las pistas puedan sonar
+    mixer.pendingPlay = true;
+    audio.pause();
+    mixStatus();
+    return;
+  }
+  syncStems(true);
+});
+audio.addEventListener("pause", () => syncStems(true));
+audio.addEventListener("seeked", () => syncStems(true));
+audio.addEventListener("ratechange", () => syncStems(true));
+setInterval(() => syncStems(false), 100);
+
+$("#mixToggle").addEventListener("click", () => {
+  const open = !$("#mixer").classList.contains("open");
+  $("#mixer").classList.toggle("open", open);
+  $("#mixToggle").setAttribute("aria-pressed", String(open));
+  mixStatus();
+});
+
 // ---------- Carga de canciones ----------
 async function loadSong(id) {
   audio.pause();
@@ -773,6 +1951,16 @@ async function loadSong(id) {
   if (!res.ok) { $("#sheet").textContent = "No se pudo cargar la canción."; return; }
   const data = await res.json();
   chords = data.chords || [];
+  noteStems = data.note_stems || [];
+  notesByStem = {};
+  notesLoadedFor = null;
+  enabledStems = new Set();
+  grid.offset = null;                                   // la rejilla es de cada canción
+  $("#scorePaper").replaceChildren();
+  $("#scoreHint").textContent = "Elige las pistas, confirma la rejilla y pulsa «Generar partitura».";
+  renderRollBar();
+  if (rollOpen) ensureNotes();
+  setupMixer(data);
   rows = buildRows(data.lines || [], chords);
   document.title = data.title + " · Visor de acordes";
   renderSheet();

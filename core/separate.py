@@ -25,3 +25,21 @@ def separate_vocals(audio: Path, out_dir: Path, model: str = "htdemucs") -> tupl
     ]
     subprocess.run(cmd, check=True)
     return vocals, rest
+
+
+# Pistas del modelo de 6 fuentes de Demucs
+STEMS_6 = ("vocals", "drums", "bass", "guitar", "piano", "other")
+
+
+def separate_all_stems(audio: Path, out_dir: Path, model: str = "htdemucs_6s") -> dict[str, Path]:
+    """Separa en voz, batería, bajo, guitarra, piano y otros. Devuelve {pista: wav}."""
+    out_dir.mkdir(parents=True, exist_ok=True)
+    stem_dir = out_dir / model / audio.stem
+    paths = {name: stem_dir / f"{name}.wav" for name in STEMS_6}
+    if all(p.is_file() and p.stat().st_mtime > audio.stat().st_mtime for p in paths.values()):
+        print("      Pistas ya separadas: se reutilizan.")
+        return paths
+
+    cmd = [sys.executable, "-m", "demucs", "-n", model, "-o", str(out_dir), str(audio)]
+    subprocess.run(cmd, check=True)
+    return paths

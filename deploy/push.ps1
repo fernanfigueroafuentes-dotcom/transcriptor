@@ -4,7 +4,7 @@
 
 .DESCRIPTION
   - App:       Dockerfile, docker-compose.yml, requirements-web.txt, .env.example y web/
-  - Canciones: songs/ SIN la carpeta stems/ (pistas separadas, pesadas y no usadas por el visor)
+  - Canciones: songs/ SIN las carpetas stems/ y stems6/ (pistas separadas, pesadas y no usadas por el visor)
   Usa ssh/scp del sistema. Este script NO contiene ni guarda credenciales: ssh te pedirá la
   contraseña en tu terminal, o usará tu clave SSH si ya la configuraste.
 
@@ -57,7 +57,8 @@ try {
         $songsDir = Join-Path $Root "songs"
         if (-not (Test-Path $songsDir)) { throw "No existe $songsDir" }
         $songsTar = Join-Path $Tmp "songs.tar"
-        Invoke-Native "tar" @("-C", $songsDir, "--exclude=stems", "-cf", $songsTar, ".")
+        # stems/ y stems6/ son las pistas separadas (cientos de MB): el visor no las usa
+        Invoke-Native "tar" @("-C", $songsDir, "--exclude=stems", "--exclude=stems6", "--exclude=notes_raw.json", "-cf", $songsTar, ".")
         Send-Tar -Name "songs" -TarFile $songsTar -RemoteDir "$Dest/songs"
     }
     if ($DryRun) { Write-Host "`n(DryRun: no se subió nada)" }

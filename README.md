@@ -49,6 +49,74 @@ python cli.py mi_cancion.mp3 --model medium
 
 Los resultados quedan en `songs/<nombre_cancion>/`.
 
+## Transcripción de notas (solos y arreglos)
+
+Además de acordes y letra, se pueden transcribir las **notas** (altura, inicio y duración) de cada
+instrumento, para sacar solos y arreglos. Primero procesa la canción como siempre y luego:
+
+```bash
+python transcribe_notes.py light_as_a_feather
+python transcribe_notes.py light_as_a_feather --stems guitar,piano --mono guitar
+python transcribe_notes.py light_as_a_feather --stems other --force
+```
+
+- **Cómo funciona:** Demucs separa la canción en 6 pistas (voz, batería, bajo, guitarra, piano y otros) y
+  Basic Pitch transcribe las notas de cada una. Genera `songs/<cancion>/notes.json` (lo lee el visor) y un
+  archivo `midi/<pista>.mid` por pista. La batería no se transcribe.
+- **`--mono`:** deja una sola nota a la vez; útil para el bajo (es el valor por defecto) o para un solo de
+  una línea. Con las demás pistas se conservan las notas simultáneas.
+- **Visor, botón «Piano roll»:** las notas de cada pista en colores, con su nombre, en una ventana de 8 a
+  60 s que sigue al audio. Se pueden ocultar pistas, hacer clic para saltar a ese instante y, marcando **A y B**
+  en el reproductor, **«Descargar tramo A–B»** da el MIDI solo de ese pasaje (por ejemplo, un solo).
+- **Formato MIDI:** tempo fijo de 120 bpm con los tiempos reales del audio. No está cuantizado ni tiene
+  compás: al importarlo en un editor de partituras o DAW hay que cuantizarlo allí.
+
+**Instalación** (una vez). Basic Pitch se instala sin TensorFlow, usando su motor ONNX (`onnxruntime` ya
+viene con las dependencias de la letra). Con `pip install basic-pitch` a secas se instalaría TensorFlow
+(más de 500 MB) y se cambiarían versiones de otros paquetes:
+
+```bash
+pip install pretty_midi mir_eval resampy
+pip install --no-deps basic-pitch
+```
+
+**Límites a tener en cuenta:**
+- Basic Pitch es un modelo general: va bien con piano y líneas de una voz, y peor con mezclas densas,
+  pasajes muy rápidos o instrumentos que suenan a la vez. Habrá notas de más, notas que faltan y octavas
+  equivocadas; es un borrador para corregir de oído, no una partitura final.
+- La separación en 6 pistas no es perfecta: la pista «guitarra» o «piano» puede contener otros instrumentos
+  (por ejemplo, un piano eléctrico) y «otros» agrupa sintetizadores, vientos y cuerdas.
+- Todavía no genera partitura ni tablatura.
+
+### Afinar la transcripción
+
+Las notas crudas del modelo se guardan en `notes_raw.json` y se depuran por instrumento (quita notas muy cortas o débiles, une notas partidas, elimina armónicos fantasma a la octava/doceava, limita la polifonía). Se puede reajustar al instante, sin repetir el modelo:
+
+```bash
+python transcribe_notes.py <id> --refine-only --strength 1.3   # más limpio (menos notas)
+python transcribe_notes.py <id> --refine-only --strength 0.7   # conserva más notas
+python transcribe_notes.py <id> --force --onset 0.6 --frame 0.35   # repetir el modelo con umbrales más estrictos
+```
+
+No hay una transcripción de referencia contra la que medir: ajusta de oído con el piano roll y el MIDI.
+
+### Partitura y tablatura (Notas → Partitura)
+
+Sobre las notas transcritas se puede fijar una **rejilla rítmica** y generar partitura:
+
+1. En la vista *Notas* elige un tramo (A–B) y escribe el tempo (o pulsa *Sugerir*; muestra el ajuste junto al valor de azar).
+2. Marca con *Aquí* dónde cae el tiempo 1 y comprueba con el metrónomo; ajusta compás y subdivisión (corcheas, semicorcheas, fusas).
+3. *Generar partitura* dibuja la partitura en el navegador (OpenSheetMusicDisplay); *MusicXML* la descarga (MuseScore, Finale, Sibelius) y *MIDI cuantizado* exporta cada pista clavada en la rejilla. Guitarra y bajo pueden incluir pentagrama de tablatura.
+
+Límites honestos:
+
+- El tempo y el inicio los **confirmas tú**: el seguimiento automático de pulso no fue fiable con la canción de prueba.
+- Rejilla fija: no hay tresillos, swing ni cambios de tempo/compás.
+- La transcripción es un **borrador** (Basic Pitch): revísala. La tonalidad se estima y las digitaciones de la tablatura son una propuesta cómoda, no la única.
+- Tramos de hasta 180 s.
+
+Pruebas: `python -m unittest discover -s tests -v` (si tienes `music21`, además relee las partituras generadas).
+
 ## Notas
 
 - `letra.txt` es tu propia copia de la letra. Solo se usa para calcular tiempos; no se publica nada.
@@ -91,27 +159,71 @@ Muestra la letra con los acordes encima, sincronizada con el audio:
 - Se adapta al celular y al modo oscuro.
 - Botón **Diagramas**: panel con el acorde que suena ahora y una tarjeta por cada acorde de la canción (ordenados por tiempo total), en **guitarra**, **piano** o ambos. Clic en una tarjeta para saltar a la próxima vez que suena. Los diagramas siguen la transposición y la alternancia ♯/♭.
 
+### Tono y velocidad del audio
+
+- **Tono − / +** transpone los acordes y, con la casilla **Audio** marcada, también el sonido
+  (al intervalo más cercano: subir 7 semitonos suena como bajar 5, con los mismos acordes).
+- **Velocidad** de 0.5× a 1.25× sin cambiar el tono.
+
+Ambas cosas las hace Signalsmith Stretch (WASM, MIT) en el navegador, también con el mezclador
+activo: los audios se aceleran o frenan sin conservar el tono y un único procesador corrige el
+tono y aplica la transposición, lo que suena mejor que el estirado del navegador a 0.5–0.75×.
+Con tono 0 y velocidad 1× el audio no pasa por el procesador. El procesador añade unos 120 ms
+de retraso, que se compensan en el resaltado de la letra, el bucle y el metrónomo. Si el
+navegador no admite AudioWorklet, la velocidad la hace el propio navegador y el tono del audio
+no cambia (se avisa junto al botón).
+
+### Mezclador de pistas
+
+El botón **Mezcla** (abajo, junto a ±5 s) abre un mezclador con las pistas separadas: silenciar (M),
+escuchar solo (S) y volumen por pista, más atajos (*Sin voz*, *Sin guitarra*, *Sin bajo*, *Solo voz*).
+Con todo en su punto neutro suena el audio original; en cuanto cambias algo suenan las pistas,
+sincronizadas con el reproductor (bucle A–B, saltos y velocidad siguen funcionando). La mezcla se
+recuerda por canción en el navegador.
+
+Las pistas se comprimen a AAC (`songs/<id>/mix/*.m4a`, unos 5 MB por pista y por cada 4 min) al
+procesar con `cli.py` o `transcribe_notes.py`. Para canciones ya procesadas:
+
+```bash
+python prepare_mix.py <id>          # usa las pistas que ya existan (6, o voz + acompañamiento)
+python prepare_mix.py <id> --six    # separa antes en 6 pistas con Demucs
+```
+
+Requiere `ffmpeg` en el PATH donde se procesa. Límite conocido: en iPhone/iPad el volumen por pista
+no se puede cambiar (iOS lo bloquea); silenciar y aislar sí funcionan.
+
 ### Diagramas de acordes
 
 Se dibujan en SVG a partir del nombre del acorde (`web/static/chords.js`), así que sirven para cualquier
 transposición y no necesitan imágenes.
 
-- **Guitarra:** para los acordes con digitación abierta conocida (C, D, E, G, A, Am, Dm, Em, séptimas, sus…)
-  se usa una tabla de formas estándar. Para el resto, formas móviles de **Mi** y de **La** con cejilla,
-  en la posición más baja (por ejemplo F = `133211`, B = `x24442`, F#m = `244222`). Para calidades poco
-  comunes (dim, m7b5, aug…) hay formas de La y, como último recurso, una búsqueda de digitaciones playables.
-  La raíz se marca en naranja y se indica el traste inicial (`4fr`) cuando el acorde está arriba del mástil.
-- **Piano:** dos octavas con las notas del acorde en estado fundamental y su nombre sobre cada tecla.
-- Los nombres que el detector no reconoce se dibujan como tríada aproximada (con `≈`).
-- **Todas las posiciones:** con las flechas `‹ 2/5 ›` de cada diagrama se recorren las digitaciones.
-  Para mayor, menor, 7, m7 y maj7 son las **cinco formas CAGED** (C, A, G, E, D): se obtienen desplazando
-  los acordes abiertos por el mástil, así que el mismo acorde sale en cinco zonas, de grave a aguda. La
-  principal va primera. Los demás tipos de acorde (sus, dim, aug, 6…) tienen una sola digitación.
-- **Piano:** las flechas recorren las inversiones (fundamental, 1.ª, 2.ª y 3.ª si hay séptima) con la
-  nota del bajo.
-- La elección se guarda en el navegador por acorde; si transpones, el acorde cambia de nombre y vuelve
-  a la primera opción.
-- Las séptimas que el detector no distingue aparecen como tríadas (ver Estado).
+**Catálogo (38 tipos):** tríadas (mayor, m, dim, aug), suspendidos (sus2, sus4, 7sus4, 9sus4), sextas (6, m6,
+6/9, m6/9), séptimas (7, maj7, m7, m(maj7), dim7, m7♭5 semidisminuido, 7♭5, 7♯5, maj7♯5), novenas (add9,
+madd9, 9, maj9, m9), alterados (7♭9, 7♯9, 7♯5♭9, 7♯5♯9, 7♭13, 7♯11, maj7♯11) y oncenas/trecenas (11, m11,
+13, maj13, m13). Se reconocen también otras grafías: `Δ`, `M7`, `ø`, `°`, `+`, `-`, `min`, `sus`, `add2`…
+
+- **Guitarra:** con las flechas `‹ 2/5 ›` de cada diagrama se recorren las digitaciones.
+  - Mayor, menor, 7, m7 y maj7: la forma principal (abierta si existe) y las **cinco formas CAGED**
+    (C, A, G, E, D), que se obtienen desplazando los acordes abiertos por el mástil.
+  - Resto de tipos: la forma principal (acordes abiertos conocidos, o formas de Mi y de La) y formas
+    **móviles generadas** con la raíz en la 6.ª, 5.ª y 4.ª cuerda, sin cuerdas al aire, con la raíz en el
+    bajo, todas las notas imprescindibles (la quinta y a veces la 9.ª pueden omitirse), como mucho un hueco
+    mudo, 4 trastes de ancho y 4 dedos. Salen digitaciones como `x-3-2-3-4-x` (7♯9), `x-3-2-4-3-x` (maj9) o
+    `x-3-4-3-4-x` (m7♭5).
+  - La raíz se marca en naranja y se indica el traste inicial (`4fr`) cuando el acorde está arriba del mástil.
+- **Piano:** las flechas recorren las inversiones. En estado fundamental las notas van apiladas y las
+  extensiones (9, 11, 13) una octava arriba; el teclado pasa a 3 octavas si hace falta. Cada diagrama
+  nombra las notas.
+- **Diccionario de acordes** (panel Diagramas, al final): eliges nota y tipo y ves cualquier acorde del
+  catálogo con sus notas, digitaciones e inversiones, aunque no aparezca en la canción.
+- La elección de digitación se guarda en el navegador por acorde; si transpones, el acorde cambia de nombre
+  y vuelve a la primera opción.
+- Los nombres que no se reconocen se dibujan como tríada aproximada (con `≈`).
+
+**Qué detecta el modelo y qué no:** el detector (BTC) solo distingue 14 tipos: mayor, menor, dim, aug, 6, m6,
+7, maj7, m7, m(maj7), dim7, m7♭5, sus2 y sus4. Las novenas, oncenas, trecenas, `add9`, 7sus4, 6/9 y los
+acordes alterados **no se detectan**: solo se pueden consultar en el diccionario. Incluso entre los 14,
+las séptimas se confunden a menudo con tríadas (ver Estado).
 
 `cli.py` guarda una copia del audio (`audio.mp3`, etc.) y un `meta.json` con el título en la carpeta de cada
 canción; el visor los usa. Para una canción procesada antes de esa versión, copia el audio a su carpeta

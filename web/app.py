@@ -3,6 +3,7 @@
     GET /api/songs        lista de canciones procesadas
     GET /api/songs/{id}   letra con tiempos, acordes y URL del audio
     GET /media/{id}/audio audio original (con soporte de Range para saltar en el reproductor)
+    GET /media/{id}/mix/{pista}.m4a  pista separada comprimida, para el mezclador
     GET /healthz          comprobación de salud (sin autenticación y sin datos)
 
 Variables de entorno:
@@ -20,9 +21,13 @@ import re
 import secrets
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException, Request, Response
+from fastapi import FastAPI, HTTPException, Query, Request, Response
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
+
+from .midi import cut_notes, write_midi, write_midi_grid
+from .musicxml import build_score
+from .quantize import ALLOWED_SUBDIV, bar_divisions, grid_fit, quantize
 
 ROOT = Path(__file__).resolve().parent.parent
 SONGS_DIR = Path(os.environ.get("SONGS_DIR") or ROOT / "songs")
@@ -135,7 +140,174 @@ def get_song(song_id: str):
         "lines": _read_json(song_dir / "lyrics.json", []),
         "chords": _read_json(song_dir / "chords.json", []),
         "audio": f"/media/{song_id}/audio" if _audio_file(song_dir) else None,
+        "note_stems": sorted(_read_json(song_dir / "notes.json", {}).get("stems", {})),
+        "mix": _mix_stems(song_id, song_dir),
     }
+
+
+MIX_STEM_RE = re.compile(r"^[a-z_]+$")
+
+
+def _mix_stems(song_id: str, song_dir: Path) -> list[dict]:
+    """Pistas del mezclador que existen de verdad en disco (mix/mix.json + mix/<pista>.m4a)."""
+    index = _read_json(song_dir / "mix" / "mix.json", {})
+    out = []
+    for stem in index.get("stems", []):
+        sid = str(stem.get("id", ""))
+        if MIX_STEM_RE.match(sid) and (song_dir / "mix" / f"{sid}.m4a").is_file():
+            out.append({"id": sid, "label": str(stem.get("label") or sid), "url": f"/media/{song_id}/mix/{sid}.m4a"})
+    return out
+
+
+# Pistas con notas transcritas y programa MIDI para que el archivo suene con un timbre parecido
+NOTE_PROGRAMS = {"vocals": 52, "bass": 33, "guitar": 27, "piano": 0, "other": 80}
+
+
+@app.get("/api/songs/{song_id}/notes")
+def get_notes(song_id: str):
+    """Notas transcritas por pista: {"stems": {pista: {"mono": bool, "notes": [[ini, fin, altura, vel]]}}}."""
+    data = _read_json(_song_dir(song_id) / "notes.json", None)
+    if not data or not data.get("stems"):
+        raise HTTPException(404, "Esta canción no tiene notas transcritas")
+    return data
+
+
+@app.get("/media/{song_id}/midi/{stem}.mid")
+def get_midi(
+    song_id: str,
+    stem: str,
+    start: float | None = Query(None, ge=0, le=36000),
+    end: float | None = Query(None, ge=0, le=36000),
+):
+    """MIDI de una pista, entero o recortado al tramo [start, end] (en segundos)."""
+    if stem not in NOTE_PROGRAMS:
+        raise HTTPException(404, "Pista no válida")
+    if start is not None and end is not None and end <= start:
+        raise HTTPException(400, "El final del tramo debe ser mayor que el inicio")
+    entry = _read_json(_song_dir(song_id) / "notes.json", {}).get("stems", {}).get(stem)
+    if not entry:
+        raise HTTPException(404, "Esa pista no está transcrita")
+    notes = cut_notes(entry["notes"], start, end)
+    if not notes:
+        raise HTTPException(404, "No hay notas de esta pista en ese tramo")
+    body = write_midi(notes, name=stem, program=NOTE_PROGRAMS[stem])
+    tramo = f"-{start:.0f}s-{end:.0f}s" if start is not None and end is not None else ""
+    return Response(
+        body, media_type="audio/midi",
+        headers={"Content-Disposition": f'attachment; filename="{song_id}-{stem}{tramo}.mid"'},
+    )
+
+
+STEM_LABELS = {"vocals": "Voz", "bass": "Bajo", "guitar": "Guitarra", "piano": "Piano", "other": "Otros"}
+MAX_REGION_SECONDS = 180
+METER_RE = re.compile(r"^(\d{1,2})/(2|4|8|16)$")
+
+
+def _grid_request(song_id: str, stems: str, start: float, end: float, meter: str, subdiv: int):
+    """Valida lo común a partitura y MIDI cuantizado. Devuelve ({pista: notas}, (num, den))."""
+    data = _read_json(_song_dir(song_id) / "notes.json", {}).get("stems", {})
+    if not data:
+        raise HTTPException(404, "Esta canción no tiene notas transcritas")
+    names = [s for s in stems.split(",") if s] or sorted(data)
+    for name in names:
+        if name not in data or name not in NOTE_PROGRAMS:
+            raise HTTPException(404, f"La pista {name!r} no está transcrita")
+    if end <= start:
+        raise HTTPException(400, "El final del tramo debe ser mayor que el inicio")
+    if end - start > MAX_REGION_SECONDS:
+        raise HTTPException(400, f"El tramo no puede durar más de {MAX_REGION_SECONDS} s")
+    match = METER_RE.match(meter)
+    if not match:
+        raise HTTPException(400, "Compás no válido (ejemplos: 4/4, 3/4, 6/8)")
+    time_sig = (int(match.group(1)), int(match.group(2)))
+    if subdiv not in ALLOWED_SUBDIV:
+        raise HTTPException(400, f"subdiv debe ser uno de {list(ALLOWED_SUBDIV)}")
+    try:
+        bar_divisions(time_sig, subdiv)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    return {name: data[name]["notes"] for name in names}, time_sig
+
+
+def _quantize_all(by_stem, bpm, offset, subdiv, time_sig, start, end):
+    """Cuantiza todas las pistas con el mismo relleno inicial para que sigan alineadas."""
+    pad = max(quantize(notes, bpm, offset, subdiv, time_sig, start, end)[1] for notes in by_stem.values())
+    return {stem: quantize(notes, bpm, offset, subdiv, time_sig, start, end, pad=pad)[0]
+            for stem, notes in by_stem.items()}
+
+
+def _mmss(seconds: float) -> str:
+    seconds = int(seconds)
+    return f"{seconds // 60}:{seconds % 60:02d}"
+
+
+@app.get("/media/{song_id}/score.musicxml")
+def get_score(
+    song_id: str,
+    start: float = Query(..., ge=0, le=36000),
+    end: float = Query(..., ge=0, le=36000),
+    bpm: float = Query(..., ge=30, le=300),
+    offset: float = Query(..., ge=-100, le=36000),
+    stems: str = Query("", max_length=60),
+    meter: str = Query("4/4", max_length=6),
+    subdiv: int = Query(4),
+    tab: int = Query(1, ge=0, le=1),
+    download: int = Query(0, ge=0, le=1),
+):
+    """Partitura MusicXML de un tramo, con la rejilla que indica el usuario.
+
+    `offset` es el instante (s) en que cae el primer tiempo de un compás; `bpm` el tempo fijo.
+    """
+    by_stem, time_sig = _grid_request(song_id, stems, start, end, meter, subdiv)
+    quantized = _quantize_all(by_stem, bpm, offset, subdiv, time_sig, start, end)
+    parts = [{"stem": stem, "name": STEM_LABELS.get(stem, stem), "notes": notes}
+             for stem, notes in quantized.items() if notes]
+    if not parts:
+        raise HTTPException(404, "No hay notas en ese tramo")
+    meta = _read_json(_song_dir(song_id) / "meta.json", {})
+    title = f"{meta.get('title') or song_id} ({_mmss(start)}–{_mmss(end)})"
+    try:
+        xml, info = build_score(parts, bpm, time_sig, subdiv, title=title, with_tab=bool(tab))
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    fit = grid_fit([n for notes in by_stem.values() for n in notes], bpm, offset, subdiv, start=start, end=end)
+    headers = {
+        "X-Score-Bars": str(info["bars"]),
+        "X-Score-Key": f"{info['fifths']}:{info['mode']}",
+        "X-Score-Dropped": str(info["dropped_notes"]),
+        "X-Score-Clamped": str(info["clamped_notes"]),
+        "X-Score-Fit": str(fit["fraction"]),
+        "X-Score-Baseline": str(fit["baseline"]),
+        "X-Score-Onsets": str(fit["onsets"]),
+        "Access-Control-Expose-Headers": "X-Score-Bars, X-Score-Key, X-Score-Dropped, X-Score-Clamped, "
+                                         "X-Score-Fit, X-Score-Baseline, X-Score-Onsets",
+    }
+    if download:
+        headers["Content-Disposition"] = f'attachment; filename="{song_id}-{start:.0f}s-{end:.0f}s.musicxml"'
+    return Response(xml, media_type="application/vnd.recordare.musicxml+xml", headers=headers)
+
+
+@app.get("/media/{song_id}/grid/{stem}.mid")
+def get_grid_midi(
+    song_id: str,
+    stem: str,
+    start: float = Query(..., ge=0, le=36000),
+    end: float = Query(..., ge=0, le=36000),
+    bpm: float = Query(..., ge=30, le=300),
+    offset: float = Query(..., ge=-100, le=36000),
+    meter: str = Query("4/4", max_length=6),
+    subdiv: int = Query(4),
+):
+    """MIDI cuantizado de una pista: con el tempo y el compás de la rejilla, listo para un editor."""
+    by_stem, time_sig = _grid_request(song_id, stem, start, end, meter, subdiv)
+    notes = quantize(by_stem[stem], bpm, offset, subdiv, time_sig, start, end)[0]
+    if not notes:
+        raise HTTPException(404, "No hay notas de esta pista en ese tramo")
+    body = write_midi_grid(notes, subdiv, bpm, time_sig, name=stem, program=NOTE_PROGRAMS[stem])
+    return Response(
+        body, media_type="audio/midi",
+        headers={"Content-Disposition": f'attachment; filename="{song_id}-{stem}-{start:.0f}s-{end:.0f}s-cuantizado.mid"'},
+    )
 
 
 @app.get("/media/{song_id}/audio")
@@ -144,6 +316,16 @@ def get_audio(song_id: str):
     if audio is None:
         raise HTTPException(404, "Esta canción no tiene audio")
     return FileResponse(audio)
+
+
+@app.get("/media/{song_id}/mix/{stem}.m4a")
+def get_mix_stem(song_id: str, stem: str):
+    if not MIX_STEM_RE.match(stem):
+        raise HTTPException(404, "Pista no encontrada")
+    path = _song_dir(song_id) / "mix" / f"{stem}.m4a"
+    if not path.is_file():
+        raise HTTPException(404, "Pista no encontrada")
+    return FileResponse(path, media_type="audio/mp4")
 
 
 # Debe ir al final: sirve index.html en "/"

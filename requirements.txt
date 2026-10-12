@@ -2,6 +2,10 @@
 #   1) PyTorch 2.8.0 con CUDA 12.8 (necesario para RTX 5060 / Blackwell)
 #   2) pip install -r requirements.txt
 #   3) pip install -U ctranslate2   (whisperx fija una versión que busca cuDNN 8; torch 2.8 trae cuDNN 9)
+#   4) Transcripción de notas, a mano y SIN TensorFlow (basic-pitch no va aquí a propósito: con
+#      "pip install basic-pitch" traería TensorFlow y cambiaría versiones de otros paquetes):
+#        pip install pretty_midi mir_eval resampy
+#        pip install --no-deps basic-pitch
 demucs
 whisperx
 faster-whisper
