@@ -173,6 +173,24 @@ de retraso, que se compensan en el resaltado de la letra, el bucle y el metróno
 navegador no admite AudioWorklet, la velocidad la hace el propio navegador y el tono del audio
 no cambia (se avisa junto al botón).
 
+### Corregir acordes
+
+El botón **Editar acordes** activa el modo edición: un clic en un acorde abre un editor para
+
+- cambiar el nombre (con validación y sugerencias), también **acordes con bajo** como `C/E`,
+  `D/F#` o `Am7/G`; opcionalmente en **todas las veces** que aparece ese acorde;
+- **dividirlo** o hacer que **empiece** en el punto donde está el audio, o **quitarlo**;
+- con **＋ Acorde aquí** se añade uno en el momento actual. **Deshacer** (o Ctrl+Z) y
+  **Restaurar originales** (dos clics) completan el modo.
+
+Los nombres se escriben en el tono que se ve en pantalla y se guardan en el original. Las
+correcciones van a `songs/<id>/chords.edit.json` (el `chords.json` detectado no se toca); si el
+servidor es de solo lectura (Docker en el VPS, o `CHORD_EDITS=0`) se guardan en el navegador.
+`deploy/push.ps1` sube las correcciones hechas en local junto con la canción.
+
+Los diagramas entienden los acordes con bajo: en guitarra se buscan posiciones con esa nota
+como la más grave y en piano el bajo va en la mano izquierda, con el acorde encima.
+
 ### Práctica: secciones, pausa entre vueltas y entrenador de velocidad
 
 El botón **Práctica** (abajo, junto a Mezcla) abre:

@@ -45,6 +45,8 @@ select, button {
   border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; cursor: pointer;
 }
 button:hover, select:hover { border-color: var(--accent); }
+button:disabled { opacity: .45; cursor: default; }
+button:disabled:hover { border-color: var(--line); }
 button:focus-visible, select:focus-visible, input:focus-visible {
   outline: 2px solid var(--accent); outline-offset: 2px;
 }
@@ -148,6 +150,29 @@ footer { background: var(--panel); border-top: 1px solid var(--line); padding: 1
   .strip .name { font-size: 11px; }
   .strip button { width: 22px; height: 22px; font-size: 11px; }
 }
+
+/* Corrección de acordes */
+#editToggle[aria-pressed="true"] { background: var(--chord); border-color: var(--chord); color: var(--bg); font-weight: 700; }
+body.editing .chord { outline: 1px dashed var(--chord); outline-offset: 1px; cursor: text; }
+#editBar { position: sticky; top: -20px; z-index: 3; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px;
+  max-width: 900px; margin: -8px auto 12px; padding: 8px 10px; background: var(--panel); border: 1px solid var(--chord);
+  border-radius: 10px; font-size: 13px; }
+#editBar[hidden] { display: none; }
+#editBar button { font-size: 13px; padding: 4px 9px; }
+#editStatus { color: var(--muted); flex: 1; min-width: 12em; }
+#chordEditor { position: fixed; z-index: 20; width: min(330px, calc(100vw - 16px)); padding: 10px 12px;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 8px 28px rgba(0,0,0,.25); }
+#chordEditor[hidden] { display: none; }
+#ceTitle { font-size: 12px; color: var(--muted); margin-bottom: 6px; }
+#ceName { width: 100%; font: 700 20px/1.2 ui-monospace, "Cascadia Mono", Consolas, monospace; color: var(--chord);
+  background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; }
+#ceInfo { font-size: 12px; color: var(--muted); min-height: 2.4em; margin: 4px 0 6px; }
+#ceInfo.bad { color: #c0392b; }
+.ce-all { display: flex; gap: 6px; align-items: center; font-size: 13px; margin-bottom: 8px; }
+.ce-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.ce-actions button { font-size: 13px; padding: 4px 9px; }
+#ceApply { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 700; }
+#ceDelete { color: #c0392b; }
 
 /* Piano roll */
 #roll { display: none; grid-row: 2; grid-column: 1; flex-direction: column; min-height: 0; min-width: 0; background: var(--bg); }
@@ -316,10 +341,34 @@ figure.fig { margin: 0; display: flex; flex-direction: column; align-items: cent
     </div>
     <label class="toggle"><input type="checkbox" id="autoscroll" checked> Seguir la letra</label>
     <button id="panelToggle" aria-pressed="false" title="Diagramas de guitarra y piano">Diagramas</button>
+    <button id="editToggle" aria-pressed="false" title="Corregir acordes: nombre, bajo, división, inicio">Editar acordes</button>
     <button id="rollToggle" aria-pressed="false" title="Notas transcritas de solos y arreglos: piano roll y partitura">Notas</button>
   </header>
 
-  <main id="main"><div id="sheet"></div></main>
+  <main id="main">
+    <div id="editBar" hidden>
+      <strong>Editando acordes</strong>
+      <span id="editStatus" role="status"></span>
+      <button id="editAdd" type="button">＋ Acorde aquí</button>
+      <button id="editUndo" type="button" disabled>Deshacer</button>
+      <button id="editRestore" type="button">Restaurar originales</button>
+    </div>
+    <div id="sheet"></div>
+  </main>
+  <div id="chordEditor" role="dialog" aria-label="Editar acorde" hidden>
+    <div id="ceTitle"></div>
+    <input id="ceName" type="text" list="ceList" autocomplete="off" spellcheck="false" maxlength="20" aria-label="Nombre del acorde">
+    <datalist id="ceList"></datalist>
+    <div id="ceInfo" aria-live="polite"></div>
+    <label class="ce-all"><input type="checkbox" id="ceAll"> <span id="ceAllLabel"></span></label>
+    <div class="ce-actions">
+      <button id="ceApply" type="button">Aplicar</button>
+      <button id="ceSplit" type="button">Dividir aquí</button>
+      <button id="ceStart" type="button">Empieza aquí</button>
+      <button id="ceDelete" type="button">Quitar</button>
+      <button id="ceCancel" type="button">Cancelar</button>
+    </div>
+  </div>
 
   <section id="roll" aria-label="Notas transcritas">
     <div class="roll-bar">
@@ -512,16 +561,21 @@ let rollMode = "roll", showGridLines = true, audioCtx = null, lastClick = null;
 const metroLog = [];                  // últimos clics programados (sirve para comprobar el metrónomo)
 
 // ---------- Transposición ----------
-function transpose(name) {
-  const m = /^([A-G])([#b]?)(.*)$/.exec(name);
-  if (!m) return name;
-  const root = m[1] + m[2];
-  let idx = SHARP.indexOf(root);
-  if (idx < 0) idx = FLAT.indexOf(root);
-  if (idx < 0) return name;
-  const next = (((idx + shift) % 12) + 12) % 12;
-  return (useFlats ? FLAT : SHARP)[next] + m[3];
+function shiftNote(note, n, flats) {
+  let idx = SHARP.indexOf(note);
+  if (idx < 0) idx = FLAT.indexOf(note);
+  if (idx < 0) return null;
+  return (flats ? FLAT : SHARP)[(((idx + n) % 12) + 12) % 12];
 }
+// Transpone raíz y bajo: 'C/E' +2 -> 'D/F#'. '6/9' no es un bajo y se deja tal cual.
+function transposeBy(name, n, flats = useFlats) {
+  const m = /^([A-G][#b]?)(.*?)(?:\/([A-G][#b]?))?$/.exec(name);
+  if (!m) return name;
+  const root = shiftNote(m[1], n, flats);
+  if (root == null) return name;
+  return root + m[2] + (m[3] ? "/" + (shiftNote(m[3], n, flats) || m[3]) : "");
+}
+function transpose(name) { return transposeBy(name, shift); }
 
 function refreshChordLabels() {
   chordEls.forEach((el, i) => { if (el) el.textContent = transpose(chords[i].chord); });
@@ -569,7 +623,7 @@ function makeChordButton(c) {
   b.className = "chord";
   b.type = "button";
   b.textContent = transpose(c.chord);
-  b.addEventListener("click", () => seek(c.start));
+  b.addEventListener("click", () => (edit.on ? openChordEditor(c.i, b) : seek(c.start)));
   chordEls[c.i] = b;
   return b;
 }
@@ -2236,6 +2290,289 @@ buildSpeedOptions();
 $("#snapBars").checked = loadPref("snapBars", false);
 $("#loopGap").value = String(loadPref("loopGap", "0"));
 
+// ---------- Corrección de acordes ----------
+// En modo edición, un clic en un acorde abre un editor: cambiar el nombre (también con bajo,
+// p. ej. C/E), cambiar todas las veces que aparece, dividirlo o hacerlo empezar donde está el
+// audio, o quitarlo. Se guarda en el servidor (chords.edit.json, el original no se toca) o, si
+// el servidor es de solo lectura, en este navegador. Los nombres se escriben en el tono que se
+// ve en pantalla y se guardan en el tono original.
+const edit = { on: false, songId: null, lines: [], canEdit: false, store: "none", undo: [], saveTimer: null, restoreArm: null, idx: -1 };
+
+function setSongChords(data) {
+  edit.songId = data.id;
+  edit.lines = data.lines || [];
+  edit.canEdit = !!data.can_edit;
+  edit.undo = [];
+  edit.store = data.chords_edited ? "server" : "none";
+  let list = data.chords || [];
+  if (!data.chords_edited) {
+    const local = loadPref("chordsEdit:" + data.id, null);
+    if (Array.isArray(local) && local.length) { list = local; edit.store = "local"; }
+  }
+  chords = list.map((c) => ({ start: +c.start, end: +c.end, chord: String(c.chord) }));
+  closeChordEditor();
+  editStatus();
+}
+
+function editStatus(text) {
+  const st = $("#editStatus");
+  if (text) { st.textContent = text; return; }
+  st.textContent = edit.store === "server" ? "Acordes corregidos (guardados en el servidor)."
+    : edit.store === "local" ? "Acordes corregidos (guardados en este navegador)."
+    : "Acordes tal como se detectaron.";
+}
+
+function rebuildChords() {
+  chords.sort((a, b) => a.start - b.start);
+  rows = buildRows(edit.lines, chords);
+  renderSheet();
+  buildTimeline();
+  refreshChordLabels();
+  curChord = -2;
+  update(true);
+}
+
+function changeChords(mutate) {
+  edit.undo.push(JSON.stringify(chords));
+  if (edit.undo.length > 50) edit.undo.shift();
+  mutate();
+  chords = chords.filter((c) => c.end - c.start >= 0.05);
+  rebuildChords();
+  scheduleSave();
+  $("#editUndo").disabled = false;
+}
+
+function scheduleSave() {
+  clearTimeout(edit.saveTimer);
+  editStatus("Guardando…");
+  edit.saveTimer = setTimeout(saveChords, 400);
+}
+
+async function saveChords() {
+  const payload = chords.map((c) => ({ start: +c.start.toFixed(3), end: +c.end.toFixed(3), chord: c.chord }));
+  if (edit.canEdit) {
+    try {
+      const res = await fetch(`/api/songs/${encodeURIComponent(edit.songId)}/chords`, {
+        method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ chords: payload }),
+      });
+      if (res.ok) {
+        edit.store = "server";
+        try { localStorage.removeItem("chordsEdit:" + edit.songId); } catch { /* sin almacenamiento */ }
+        editStatus();
+        return;
+      }
+      if (res.status !== 409) {
+        const msg = await res.json().catch(() => ({}));
+        editStatus("No se pudo guardar: " + (msg.detail || res.status));
+        return;
+      }
+      edit.canEdit = false;                 // solo lectura: seguimos en el navegador
+    } catch {
+      editStatus("Sin conexión con el servidor; guardado en este navegador.");
+    }
+  }
+  savePref("chordsEdit:" + edit.songId, payload);
+  edit.store = "local";
+  editStatus();
+}
+
+async function restoreChords() {
+  if (!edit.restoreArm) {                   // dos pasos: evita restaurar por un clic accidental
+    $("#editRestore").textContent = "¿Seguro? Pulsa otra vez";
+    edit.restoreArm = setTimeout(() => { edit.restoreArm = null; $("#editRestore").textContent = "Restaurar originales"; }, 3000);
+    return;
+  }
+  clearTimeout(edit.restoreArm);
+  edit.restoreArm = null;
+  $("#editRestore").textContent = "Restaurar originales";
+  clearTimeout(edit.saveTimer);
+  try { localStorage.removeItem("chordsEdit:" + edit.songId); } catch { /* sin almacenamiento */ }
+  if (edit.store === "server") {
+    const res = await fetch(`/api/songs/${encodeURIComponent(edit.songId)}/chords`, { method: "DELETE" }).catch(() => null);
+    if (!res || !res.ok) { editStatus("No se pudieron restaurar los acordes en el servidor."); return; }
+  }
+  const res = await fetch("/api/songs/" + encodeURIComponent(edit.songId));
+  if (!res.ok) return;
+  const data = await res.json();
+  edit.undo.push(JSON.stringify(chords));
+  setSongChords(data);
+  rebuildChords();
+  editStatus("Acordes originales restaurados (puedes deshacer).");
+}
+
+function undoChords() {
+  const prev = edit.undo.pop();
+  if (!prev) return;
+  chords = JSON.parse(prev);
+  rebuildChords();
+  scheduleSave();
+  $("#editUndo").disabled = !edit.undo.length;
+}
+
+function setEditing(on) {
+  edit.on = on;
+  document.body.classList.toggle("editing", on);
+  $("#editToggle").setAttribute("aria-pressed", String(on));
+  $("#editBar").hidden = !on;
+  $("#editUndo").disabled = !edit.undo.length;
+  if (!on) closeChordEditor();
+  editStatus();
+}
+$("#editToggle").addEventListener("click", () => setEditing(!edit.on));
+$("#editUndo").addEventListener("click", undoChords);
+$("#editRestore").addEventListener("click", restoreChords);
+
+// ----- Editor de un acorde -----
+const cleanName = (s) => String(s || "").replace(/♯/g, "#").replace(/♭/g, "b").replace(/\s+/g, "");
+
+function describe(name) {
+  const info = ChordDiagrams.parse(name);
+  if (!info) return { ok: false, text: "Nombre no reconocido (ejemplos: C, F#m7, Bb7sus4, C/E, Am7b5)." };
+  if (info.approx) return { ok: true, text: "Tipo de acorde desconocido: se guardará, pero los diagramas lo dibujan como tríada." };
+  const label = (ChordDiagrams.QUALITY_LIST.find((q) => q.suffix === info.quality) || {}).label || "";
+  const bass = info.bassPc != null ? ` con bajo en ${ChordDiagrams.noteName(info.bassPc, useFlats)}` : "";
+  return { ok: true, text: `${ChordDiagrams.noteName(info.rootPc, useFlats)} ${label}${bass}` };
+}
+
+function openChordEditor(i, anchor) {
+  const c = chords[i];
+  if (!c) return;
+  edit.idx = i;
+  const box = $("#chordEditor");
+  const shown = transpose(c.chord);
+  $("#ceTitle").textContent = `Acorde de ${fmt(c.start)} a ${fmt(c.end)}`;
+  $("#ceName").value = shown;
+  const same = chords.filter((x) => x.chord === c.chord).length;
+  $("#ceAll").checked = false;
+  $("#ceAllLabel").textContent = same > 1 ? `Cambiar las ${same} veces que aparece «${shown}»` : "Solo aparece esta vez";
+  $("#ceAll").disabled = same < 2;
+  // Sugerencias: acordes de la canción y variantes habituales de esta raíz (con sus bajos)
+  const info = ChordDiagrams.parse(shown);
+  const sugg = new Set(chords.map((x) => transpose(x.chord)));
+  if (info) {
+    const r = ChordDiagrams.noteName(info.rootPc, useFlats);
+    ["", "m", "7", "maj7", "m7", "sus4", "sus2", "dim", "m7b5", "6", "9", "add9"].forEach((q) => sugg.add(r + q));
+    info.intervals.slice(1, 3).forEach((iv) => sugg.add(`${r}${info.quality}/${ChordDiagrams.noteName(info.rootPc + iv, useFlats)}`));
+  }
+  const list = $("#ceList");
+  list.replaceChildren(...[...sugg].sort().map((v) => Object.assign(document.createElement("option"), { value: v })));
+  validateEditor();
+  refreshEditorTimes();
+  box.hidden = false;
+  // Debajo del acorde (o encima si no cabe), dentro de la ventana
+  const r = anchor.getBoundingClientRect();
+  const w = box.offsetWidth, h = box.offsetHeight;
+  const left = Math.max(8, Math.min(r.left, innerWidth - w - 8));
+  const top = r.bottom + 6 + h < innerHeight ? r.bottom + 6 : Math.max(8, r.top - h - 6);
+  box.style.left = left + "px";
+  box.style.top = top + "px";
+  $("#ceName").focus();
+  $("#ceName").select();
+}
+
+function closeChordEditor() {
+  $("#chordEditor").hidden = true;
+  edit.idx = -1;
+}
+
+function validateEditor() {
+  const d = describe(cleanName($("#ceName").value));
+  $("#ceInfo").textContent = d.text;
+  $("#ceInfo").classList.toggle("bad", !d.ok);
+  $("#ceApply").disabled = !d.ok;
+  return d.ok;
+}
+
+function refreshEditorTimes() {               // "Dividir" y "Empieza aquí" dependen de dónde está el audio
+  const c = chords[edit.idx];
+  if (!c) return;
+  const t = heardTime();
+  const prev = chords[edit.idx - 1];
+  $("#ceSplit").disabled = !(t > c.start + 0.1 && t < c.end - 0.1);
+  $("#ceStart").disabled = !(t < c.end - 0.1 && t > (prev ? prev.start + 0.1 : 0) && Math.abs(t - c.start) > 0.02);
+  $("#ceSplit").textContent = `Dividir en ${fmt(t)}`;
+  $("#ceStart").textContent = `Empieza en ${fmt(t)}`;
+}
+setInterval(() => { if (!$("#chordEditor").hidden) refreshEditorTimes(); }, 250);
+
+$("#ceName").addEventListener("input", validateEditor);
+$("#ceName").addEventListener("keydown", (e) => {
+  if (e.key === "Enter") { e.preventDefault(); $("#ceApply").click(); }
+});
+$("#chordEditor").addEventListener("keydown", (e) => { if (e.key === "Escape") closeChordEditor(); });
+$("#ceCancel").addEventListener("click", closeChordEditor);
+
+$("#ceApply").addEventListener("click", () => {
+  if (!validateEditor()) return;
+  const c = chords[edit.idx];
+  const stored = transposeBy(cleanName($("#ceName").value), -shift, false);   // al tono original
+  const old = c.chord;
+  const all = $("#ceAll").checked;
+  if (stored !== old) changeChords(() => chords.forEach((x) => { if (x === c || (all && x.chord === old)) x.chord = stored; }));
+  closeChordEditor();
+});
+
+$("#ceSplit").addEventListener("click", () => {
+  const c = chords[edit.idx];
+  const t = heardTime();
+  if (!(t > c.start + 0.1 && t < c.end - 0.1)) return;
+  const piece = { start: t, end: c.end, chord: c.chord };
+  changeChords(() => { c.end = t; chords.push(piece); });
+  const k = chords.indexOf(piece);
+  if (chordEls[k]) openChordEditor(k, chordEls[k]); else closeChordEditor();
+});
+
+$("#ceStart").addEventListener("click", () => {
+  const c = chords[edit.idx];
+  const prev = chords[edit.idx - 1];
+  const t = heardTime();
+  changeChords(() => {
+    if (prev && (prev.end > t || Math.abs(prev.end - c.start) < 0.05)) prev.end = t;   // el anterior llega hasta aquí
+    c.start = t;
+  });
+  closeChordEditor();
+});
+
+$("#ceDelete").addEventListener("click", () => {
+  const c = chords[edit.idx];
+  const prev = chords[edit.idx - 1];
+  changeChords(() => {
+    if (prev && Math.abs(prev.end - c.start) < 0.05) prev.end = c.end;               // el anterior sigue sonando
+    chords.splice(chords.indexOf(c), 1);
+  });
+  closeChordEditor();
+});
+
+// Añadir un acorde donde está el audio: divide el que suena (o llena el hueco) y abre el editor
+$("#editAdd").addEventListener("click", () => {
+  const t = heardTime();
+  const i = chords.findIndex((c) => t >= c.start && t < c.end);
+  let piece;
+  if (i >= 0 && t > chords[i].start + 0.1) {
+    const c = chords[i];
+    piece = { start: t, end: c.end, chord: c.chord };
+    changeChords(() => { c.end = t; chords.push(piece); });
+  } else if (i >= 0) {
+    piece = chords[i];
+  } else {
+    const next = chords.find((c) => c.start > t);
+    const prev = [...chords].reverse().find((c) => c.end <= t);
+    piece = { start: t, end: next ? next.start : Math.min(duration(), t + 4), chord: prev ? prev.chord : "C" };
+    changeChords(() => chords.push(piece));
+  }
+  const k = chords.indexOf(piece);
+  if (chordEls[k]) { ensureVisible(chordEls[k], false); openChordEditor(k, chordEls[k]); }
+});
+setInterval(() => { if (edit.on) $("#editAdd").textContent = `＋ Acorde en ${fmt(heardTime())}`; }, 300);
+
+document.addEventListener("keydown", (e) => {
+  if (!edit.on || e.target.closest("input, select, textarea")) return;
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") { e.preventDefault(); undoChords(); }
+});
+document.addEventListener("mousedown", (e) => {        // clic fuera del editor: se cierra
+  if (!$("#chordEditor").hidden && !e.target.closest("#chordEditor, .chord")) closeChordEditor();
+});
+
 // ---------- Carga de canciones ----------
 async function loadSong(id) {
   audio.pause();
@@ -2244,7 +2581,7 @@ async function loadSong(id) {
   const res = await fetch("/api/songs/" + encodeURIComponent(id));
   if (!res.ok) { $("#sheet").textContent = "No se pudo cargar la canción."; return; }
   const data = await res.json();
-  chords = data.chords || [];
+  setSongChords(data);
   noteStems = data.note_stems || [];
   notesByStem = {};
   notesLoadedFor = null;

@@ -75,14 +75,29 @@ const ChordDiagrams = (() => {
 
   const noteName = (pc, useFlats) => (useFlats ? FLAT : SHARP)[((pc % 12) + 12) % 12];
 
-  /** 'Ebm7b5' -> { name, rootPc, quality, intervals, optional, up, pcs, approx } o null. */
+  const pcOf = (note) => {
+    const i = SHARP.indexOf(note);
+    return i >= 0 ? i : FLAT.indexOf(note);
+  };
+
+  /**
+   * 'Ebm7b5' -> { name, rootPc, quality, intervals, optional, up, pcs, approx, bassPc } o null.
+   * Acepta acordes con bajo ('C/E', 'Am7/G'): bassPc es la nota del bajo (null si no hay o si
+   * coincide con la raíz). '6/9' no es un bajo: después de la barra tiene que venir una nota.
+   */
   function parse(name) {
-    const text = String(name || "").replace(/♯/g, "#").replace(/♭/g, "b");
+    let text = String(name || "").replace(/♯/g, "#").replace(/♭/g, "b").trim();
+    let bassPc = null;
+    const slash = /^(.+)\/([A-G][#b]?)$/.exec(text);
+    if (slash && pcOf(slash[2]) >= 0) {
+      text = slash[1];
+      bassPc = pcOf(slash[2]);
+    }
     const m = /^([A-G])([#b]?)(.*)$/.exec(text);
     if (!m) return null;
-    let rootPc = SHARP.indexOf(m[1] + m[2]);
-    if (rootPc < 0) rootPc = FLAT.indexOf(m[1] + m[2]);
+    const rootPc = pcOf(m[1] + m[2]);
     if (rootPc < 0) return null;
+    if (bassPc === rootPc) bassPc = null;
     let quality = m[3].trim();
     let approx = false;
     if (has(META, quality)) {
@@ -95,7 +110,7 @@ const ChordDiagrams = (() => {
     }
     const { intervals, optional, up } = META[quality];
     return {
-      name, rootPc, quality, intervals, approx, up,
+      name, rootPc, quality, intervals, approx, up, bassPc,
       optional: new Set(optional.map((i) => (rootPc + i) % 12)),
       pcs: new Set(intervals.map((i) => (rootPc + i) % 12)),
     };
@@ -261,12 +276,16 @@ const ChordDiagrams = (() => {
     return out.sort((a, b) => positionOf(a.frets) - positionOf(b.frets));
   }
 
+  const keyOf = (info) => info.rootPc + "|" + info.quality + "|" + (info.bassPc == null ? "" : info.bassPc);
+
   function voicing(info) {
-    const key = info.rootPc + "|" + info.quality;
+    const key = keyOf(info);
     if (!cache.has(key)) {
       cache.set(
         key,
-        openVoicing(info) || templateVoicing(info) || movableVoicings(info)[0] || searchVoicing(info),
+        info.bassPc != null
+          ? searchVoicings(info, 1)[0] || null
+          : openVoicing(info) || templateVoicing(info) || movableVoicings(info)[0] || searchVoicing(info),
       );
     }
     return cache.get(key);
@@ -307,8 +326,19 @@ const ChordDiagrams = (() => {
 
   /** Todas las digitaciones útiles: la principal primero y el resto de menor a mayor posición. */
   function voicings(info) {
-    const key = info.rootPc + "|" + info.quality;
+    const key = keyOf(info);
     if (listCache.has(key)) return listCache.get(key);
+    if (info.bassPc != null) {                       // acorde con bajo: posiciones con esa nota abajo
+      const bass = SHARP[info.bassPc];
+      const list = searchVoicings(info, 6)
+        .sort((a, b) => positionOf(a.frets) - positionOf(b.frets))
+        .map((v) => {
+          const pos = positionOf(v.frets);
+          return { frets: v.frets, barre: v.barre, pos, label: `Bajo en ${bass} · ${v.frets.includes(0) ? "abierta" : "traste " + pos}` };
+        });
+      listCache.set(key, list);
+      return list;
+    }
     const caged = cagedVoicings(info);
     const primary = voicing(info);
     const out = [];
@@ -342,6 +372,7 @@ const ChordDiagrams = (() => {
    * se tocan en la práctica. Cada inversión sube una octava la nota más grave.
    */
   function pianoVoicings(info) {
+    if (info.bassPc != null) return slashPianoVoicings(info);
     const raised = new Set(info.up);
     const base = info.intervals
       .map((iv) => info.rootPc + iv + (raised.has(iv) ? 12 : 0))
@@ -360,12 +391,45 @@ const ChordDiagrams = (() => {
     return out;
   }
 
+  /** Acorde con bajo en el piano: el bajo abajo (mano izquierda) y el acorde, en sus inversiones, encima. */
+  function slashPianoVoicings(info) {
+    const bass = info.bassPc;
+    const upper = pianoVoicings({ ...info, bassPc: null });
+    const out = [];
+    const make = (notes, label) => {
+      let up = notes.slice();
+      while (Math.min(...up) <= bass) up = up.map((n) => n + 12);
+      const all = [bass, ...up];
+      if (all[all.length - 1] > PIANO_MAX) return;
+      const rootIndex = all.findIndex((n, k) => k > 0 && n % 12 === info.rootPc);
+      out.push({ notes: all, rootIndex, bassPc: bass, label: `Bajo ${SHARP[bass]} · ${label}` });
+    };
+    upper.forEach((v) => make(v.notes, v.label.toLowerCase()));
+    if (!out.length) {                               // extensiones muy abiertas: el acorde cerrado encima
+      const closed = [...info.pcs].map((pc) => ((pc - bass + 12) % 12 || 12) + bass).sort((a, b) => a - b);
+      make(closed, "posición cerrada");
+    }
+    return out;
+  }
+
   function searchVoicing(info) {
-    const { rootPc, pcs, intervals } = info;
+    return searchVoicings({ ...info, bassPc: null }, 1)[0] || null;
+  }
+
+  /**
+   * Búsqueda por fuerza bruta de digitaciones cómodas; devuelve las `limit` mejores.
+   * Con info.bassPc la nota más grave tiene que ser ese bajo (y solo el bajo puede estar fuera
+   * del acorde); sin él, se prefiere la raíz abajo.
+   */
+  function searchVoicings(info, limit) {
+    const { rootPc, intervals } = info;
+    const wantBass = info.bassPc == null ? null : info.bassPc;
+    const pcs = new Set(info.pcs);
     const required = new Set(pcs);
     if (intervals.length >= 4) required.delete((rootPc + 7) % 12); // la quinta justa es opcional
-    let best = null;
-    let bestScore = Infinity;
+    const allowed = new Set(pcs);
+    if (wantBass != null) allowed.add(wantBass);
+    const found = new Map();                        // trastes -> { voicing, score }
     const frets = new Array(6);
 
     function evaluate() {
@@ -378,6 +442,13 @@ const ChordDiagrams = (() => {
       for (const pc of required) if (!notes.has(pc)) return;
 
       const bassPc = (OPEN_STRINGS[played[0]] + frets[played[0]]) % 12;
+      if (wantBass != null) {
+        // la nota más grave (no la cuerda más grave: una cuerda al aire puede sonar por debajo)
+        const pitches = played.map((i) => OPEN_STRINGS[i] + frets[i]);
+        if (Math.min(...pitches) % 12 !== wantBass) return;
+        // un bajo ajeno al acorde (p. ej. C/F#) no se repite en las cuerdas agudas
+        if (!pcs.has(wantBass) && played.slice(1).some((i) => (OPEN_STRINGS[i] + frets[i]) % 12 === wantBass)) return;
+      }
       const fretted = played.filter((i) => frets[i] > 0);
       const fmin = fretted.length ? Math.min(...fretted.map((i) => frets[i])) : 0;
       const fmax = fretted.length ? Math.max(...fretted.map((i) => frets[i])) : 0;
@@ -412,7 +483,7 @@ const ChordDiagrams = (() => {
 
       const opens = played.filter((i) => frets[i] === 0).length;
       const score =
-        (bassPc !== rootPc ? 200 : 0) +      // inversión: solo si no hay otra opción
+        (wantBass == null && bassPc !== rootPc ? 200 : 0) +   // inversión: solo si no hay otra opción
         (6 - played.length) * 4 +            // cuerdas mudas
         fmin * 3 +                           // posición alta
         (barre ? 5 : 0) +
@@ -420,18 +491,19 @@ const ChordDiagrams = (() => {
         opens * 2 +                          // cuerdas al aire: más cómodo
         (fmax - fmin) +
         (fmax - fmin === 3 ? 10 : 0) +       // estiramiento de 4 trastes
-        failedBarre;
-      if (score < bestScore) {
-        bestScore = score;
-        best = { frets: frets.slice(), barre, fingers };
+        failedBarre +
+        (wantBass != null && opens && fmin >= 5 ? 15 : 0);   // con bajo: al aire + posición alta, rara
+      const id = frets.join(",");
+      if (!found.has(id) || found.get(id).score > score) {
+        found.set(id, { score, voicing: { frets: frets.slice(), barre, fingers } });
       }
     }
 
     for (let base = 1; base <= 10; base++) {
       const options = OPEN_STRINGS.map((open) => {
         const o = [-1];
-        if (pcs.has(open % 12)) o.push(0);
-        for (let f = base; f <= base + 3; f++) if (pcs.has((open + f) % 12)) o.push(f);
+        if (allowed.has(open % 12)) o.push(0);
+        for (let f = base; f <= base + 3; f++) if (allowed.has((open + f) % 12)) o.push(f);
         return o;
       });
       const rec = (s) => {
@@ -440,7 +512,17 @@ const ChordDiagrams = (() => {
       };
       rec(0);
     }
-    return best;
+    // Las mejores, sin repetir casi la misma forma: se descarta la que es la misma que otra ya
+    // elegida con alguna cuerda menos (032010 frente a 03201x)
+    const ranked = [...found.values()].sort((a, b) => a.score - b.score);
+    const out = [];
+    const subsetOf = (v, u) => v.frets.every((f, i) => f < 0 || f === u.frets[i]);
+    for (const { voicing } of ranked) {
+      if (out.some((u) => subsetOf(voicing, u) || subsetOf(u, voicing))) continue;
+      out.push(voicing);
+      if (out.length >= limit) break;
+    }
+    return out;
   }
 
   // ---------- SVG ----------

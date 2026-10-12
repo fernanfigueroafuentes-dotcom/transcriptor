@@ -2,6 +2,8 @@
 
     GET /api/songs        lista de canciones procesadas
     GET /api/songs/{id}   letra con tiempos, acordes y URL del audio
+    PUT /api/songs/{id}/chords     guarda los acordes corregidos (chords.edit.json; el original no se toca)
+    DELETE /api/songs/{id}/chords  vuelve a los acordes detectados
     GET /media/{id}/audio audio original (con soporte de Range para saltar en el reproductor)
     GET /media/{id}/mix/{pista}.m4a  pista separada comprimida, para el mezclador
     GET /healthz          comprobación de salud (sin autenticación y sin datos)
@@ -11,6 +13,8 @@ Variables de entorno:
     VIEWER_USER      usuario y contraseña de acceso (HTTP Basic). Si ambas están definidas,
     VIEWER_PASSWORD  TODAS las rutas, salvo /healthz, exigen autenticación.
     REQUIRE_AUTH=1   no arranca si faltan las credenciales (lo usa la imagen de Docker)
+    CHORD_EDITS=0    impide guardar correcciones de acordes en el servidor (también si la carpeta
+                     de canciones es de solo lectura; el visor las guarda entonces en el navegador)
 """
 import asyncio
 import base64
@@ -72,6 +76,10 @@ async def protect(request: Request, call_next):
     response.headers.setdefault("X-Content-Type-Options", "nosniff")
     response.headers.setdefault("X-Frame-Options", "DENY")
     response.headers.setdefault("Referrer-Policy", "no-referrer")
+    path = request.url.path
+    if (path == "/" or path.endswith((".html", ".js", ".css"))) and not path.startswith("/vendor/"):
+        # El visor cambia con cada versión: que el navegador pregunte siempre (304 si no cambió)
+        response.headers.setdefault("Cache-Control", "no-cache")
     return response
 
 
@@ -134,15 +142,97 @@ def get_song(song_id: str):
     if not _is_song(song_dir):
         raise HTTPException(404, "Canción incompleta")
     meta = _read_json(song_dir / "meta.json", {})
+    edited = _read_json(song_dir / CHORD_EDIT_FILE, None)
+    edited = edited if isinstance(edited, list) else None
     return {
         "id": song_id,
         "title": meta.get("title") or song_id,
         "lines": _read_json(song_dir / "lyrics.json", []),
-        "chords": _read_json(song_dir / "chords.json", []),
+        "chords": edited if edited is not None else _read_json(song_dir / "chords.json", []),
+        "chords_edited": edited is not None,
+        "can_edit": _can_write(song_dir),
         "audio": f"/media/{song_id}/audio" if _audio_file(song_dir) else None,
         "note_stems": sorted(_read_json(song_dir / "notes.json", {}).get("stems", {})),
         "mix": _mix_stems(song_id, song_dir),
     }
+
+
+# ---------- Corrección de acordes ----------
+CHORD_EDIT_FILE = "chords.edit.json"
+CHORD_NAME_RE = re.compile(r"^[A-G][#b♯♭]?[\w#♯♭+\-°øΔ△()/]{0,18}$")
+MAX_CHORDS = 5000
+MAX_BODY = 1_000_000
+
+
+def _can_write(song_dir: Path) -> bool:
+    return os.environ.get("CHORD_EDITS", "1") != "0" and os.access(song_dir, os.W_OK)
+
+
+def _is_time(value) -> bool:
+    return isinstance(value, (int, float)) and not isinstance(value, bool) and 0 <= value <= 86_400
+
+
+def _clean_chords(items) -> list[dict]:
+    """Valida la lista enviada por el visor: [{start, end, chord}], ordenada y sin solapes."""
+    if not isinstance(items, list) or len(items) > MAX_CHORDS:
+        raise HTTPException(422, f"Se espera una lista de hasta {MAX_CHORDS} acordes")
+    out = []
+    for item in items:
+        if not isinstance(item, dict):
+            raise HTTPException(422, "Cada acorde debe ser un objeto {start, end, chord}")
+        start, end, chord = item.get("start"), item.get("end"), item.get("chord")
+        if not (_is_time(start) and _is_time(end)) or end <= start:
+            raise HTTPException(422, "Tiempos de acorde no válidos")
+        if not isinstance(chord, str) or not CHORD_NAME_RE.match(chord.strip()):
+            raise HTTPException(422, f"Nombre de acorde no válido: {str(chord)[:24]!r}")
+        out.append({"start": round(float(start), 3), "end": round(float(end), 3), "chord": chord.strip()})
+    out.sort(key=lambda c: c["start"])
+    for a, b in zip(out, out[1:]):
+        a["end"] = min(a["end"], b["start"])
+    return [c for c in out if c["end"] - c["start"] >= 0.01]
+
+
+@app.put("/api/songs/{song_id}/chords")
+async def put_chords(song_id: str, request: Request):
+    song_dir = _song_dir(song_id)
+    if not _is_song(song_dir):
+        raise HTTPException(404, "Canción incompleta")
+    # Solo JSON: junto con PUT, obliga a una petición "preflight" que el navegador no permite
+    # desde otros sitios (no hay CORS), así que una web ajena no puede cambiar los acordes.
+    if request.headers.get("content-type", "").split(";")[0].strip().lower() != "application/json":
+        raise HTTPException(415, "Se espera JSON")
+    body = await request.body()
+    if len(body) > MAX_BODY:
+        raise HTTPException(413, "Demasiados datos")
+    try:
+        data = json.loads(body)
+    except ValueError:
+        raise HTTPException(422, "JSON no válido") from None
+    chords = _clean_chords(data.get("chords") if isinstance(data, dict) else None)
+    if not _can_write(song_dir):
+        raise HTTPException(409, "El servidor no permite guardar cambios (carpeta de solo lectura)")
+    target = song_dir / CHORD_EDIT_FILE
+    tmp = target.with_suffix(".tmp")
+    try:
+        tmp.write_text(json.dumps(chords, ensure_ascii=False, indent=1), encoding="utf-8")
+        tmp.replace(target)
+    except OSError:
+        raise HTTPException(409, "No se pudo guardar en el servidor") from None
+    return {"ok": True, "count": len(chords)}
+
+
+@app.delete("/api/songs/{song_id}/chords")
+def delete_chords(song_id: str):
+    song_dir = _song_dir(song_id)
+    target = song_dir / CHORD_EDIT_FILE
+    if target.is_file():
+        if not _can_write(song_dir):
+            raise HTTPException(409, "El servidor no permite guardar cambios (carpeta de solo lectura)")
+        try:
+            target.unlink()
+        except OSError:
+            raise HTTPException(409, "No se pudo borrar en el servidor") from None
+    return {"ok": True}
 
 
 MIX_STEM_RE = re.compile(r"^[a-z_]+$")
