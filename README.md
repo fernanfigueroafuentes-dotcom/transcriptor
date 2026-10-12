@@ -163,7 +163,7 @@ Muestra la letra con los acordes encima, sincronizada con el audio:
 
 - **Tono − / +** transpone los acordes y, con la casilla **Audio** marcada, también el sonido
   (al intervalo más cercano: subir 7 semitonos suena como bajar 5, con los mismos acordes).
-- **Velocidad** de 0.5× a 1.25× sin cambiar el tono.
+- **Velocidad** de 0.5× a 1.25× (pasos de 5 %) sin cambiar el tono.
 
 Ambas cosas las hace Signalsmith Stretch (WASM, MIT) en el navegador, también con el mezclador
 activo: los audios se aceleran o frenan sin conservar el tono y un único procesador corrige el
@@ -172,6 +172,22 @@ Con tono 0 y velocidad 1× el audio no pasa por el procesador. El procesador añ
 de retraso, que se compensan en el resaltado de la letra, el bucle y el metrónomo. Si el
 navegador no admite AudioWorklet, la velocidad la hace el propio navegador y el tono del audio
 no cambia (se avisa junto al botón).
+
+### Práctica: secciones, pausa entre vueltas y entrenador de velocidad
+
+El botón **Práctica** (abajo, junto a Mezcla) abre:
+
+- **Secciones**: guarda el bucle A–B actual con un nombre (Intro, Coro, Solo…) y vuelve a él
+  desde la lista. Se guardan por canción en el navegador.
+- **Ajustar A/B al compás**: con la rejilla definida (Notas → Partitura), las marcas A y B caen
+  en la barra de compás más cercana.
+- **Pausa entre vueltas**: 1–3 s para volver a colocar las manos, o **1 compás con cuenta**
+  (clics del metrónomo, requiere rejilla) antes de cada repetición.
+- **Entrenador**: empieza el bucle a una velocidad (p. ej. 70 %) y la sube un 5 o 10 % cada
+  N vueltas hasta el objetivo; luego sigue repitiendo a esa velocidad.
+
+La velocidad va de 50 % a 125 % en pasos de 5 %. Atajos: **A** / **B** marcan el bucle, **X** lo
+quita, **Espacio** reproduce o pausa y **← →** saltan 5 s.
 
 ### Mezclador de pistas
 

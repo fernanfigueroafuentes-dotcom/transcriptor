@@ -108,8 +108,15 @@ footer { background: var(--panel); border-top: 1px solid var(--line); padding: 1
 .hint { color: var(--muted); font-size: 12px; margin-top: 6px; }
 
 /* Mezclador de pistas */
-#mixer { display: none; border-bottom: 1px solid var(--line); padding: 0 0 10px; margin-bottom: 10px; }
-#mixer.open { display: block; }
+#mixer, #practice { display: none; border-bottom: 1px solid var(--line); padding: 0 0 10px; margin-bottom: 10px; }
+#mixer.open, #practice.open { display: block; }
+.prow { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin-bottom: 8px; }
+.prow strong { font-size: 13px; min-width: 6.5em; }
+.prow select, .prow input[type=text] { font-size: 13px; padding: 4px 8px; }
+.prow input[type=text] { font: inherit; font-size: 13px; color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 8px; width: 14em; max-width: 100%; }
+.prow button { font-size: 13px; padding: 4px 9px; }
+#pStatus { margin-top: 0; min-height: 1.2em; }
+#practiceToggle[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); font-weight: 700; }
 .mix-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin-bottom: 8px; }
 .mix-head strong { font-size: 14px; }
 #mixStatus { color: var(--muted); font-size: 12px; flex: 1; min-width: 12em; }
@@ -128,7 +135,10 @@ footer { background: var(--panel); border-top: 1px solid var(--line); padding: 1
 #mixToggle[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); font-weight: 700; }
 #mixToggle.active::after { content: " ●"; color: var(--accent); }
 @media (max-width: 560px) {
-  #mixer { max-height: 34dvh; overflow-y: auto; padding-bottom: 8px; margin-bottom: 8px; }
+  #mixer, #practice { max-height: 34dvh; overflow-y: auto; padding-bottom: 8px; margin-bottom: 8px; }
+  .prow strong { min-width: 0; width: 100%; }
+  .prow input[type=text] { flex: 1; width: auto; }
+  #pStatus { display: block; }
   .mix-head { gap: 4px 8px; margin-bottom: 6px; }
   .mix-head strong { display: none; }
   .mix-presets { flex-wrap: nowrap; overflow-x: auto; width: 100%; }
@@ -296,11 +306,7 @@ figure.fig { margin: 0; display: flex; flex-direction: column; align-items: cent
     <div class="group">
       <label for="speed">Velocidad</label>
       <select id="speed">
-        <option value="0.5">0.5×</option><option value="0.6">0.6×</option>
-        <option value="0.7">0.7×</option><option value="0.75">0.75×</option>
-        <option value="0.8">0.8×</option><option value="0.9">0.9×</option>
         <option value="1" selected>1×</option>
-        <option value="1.1">1.1×</option><option value="1.25">1.25×</option>
       </select>
     </div>
     <div class="group">
@@ -404,6 +410,34 @@ figure.fig { margin: 0; display: flex; flex-direction: column; align-items: cent
   </aside>
 
   <footer>
+    <div id="practice" aria-label="Práctica">
+      <div class="prow">
+        <strong>Secciones</strong>
+        <select id="secSelect" aria-label="Secciones guardadas"></select>
+        <input id="secName" type="text" maxlength="30" placeholder="Nombre: Intro, Coro, Solo…" aria-label="Nombre de la sección">
+        <button id="secSave" type="button">Guardar bucle</button>
+        <button id="secDel" type="button" disabled>Borrar</button>
+      </div>
+      <div class="prow">
+        <strong>Bucle</strong>
+        <label class="toggle"><input type="checkbox" id="snapBars"> Ajustar A/B al compás</label>
+        <label class="toggle">Pausa entre vueltas
+          <select id="loopGap">
+            <option value="0">sin pausa</option><option value="1">1 s</option><option value="2">2 s</option>
+            <option value="3">3 s</option><option value="bar">1 compás con cuenta</option>
+          </select>
+        </label>
+      </div>
+      <div class="prow">
+        <strong>Entrenador</strong>
+        <label class="toggle"><input type="checkbox" id="tnOn"> Subir la velocidad</label>
+        <label class="toggle">de <select id="tnFrom" aria-label="Velocidad inicial"></select></label>
+        <label class="toggle">a <select id="tnTo" aria-label="Velocidad objetivo"></select></label>
+        <label class="toggle">+<select id="tnStep" aria-label="Aumento"><option value="0.05">5 %</option><option value="0.1">10 %</option></select></label>
+        <label class="toggle">cada <select id="tnReps" aria-label="Vueltas por paso"><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option></select> vueltas</label>
+      </div>
+      <div id="pStatus" class="hint" role="status"></div>
+    </div>
     <div id="mixer" aria-label="Mezclador de pistas">
       <div class="mix-head">
         <strong>Mezclador</strong>
@@ -419,6 +453,7 @@ figure.fig { margin: 0; display: flex; flex-direction: column; align-items: cent
       <button id="back5" aria-label="Retroceder 5 segundos">−5 s</button>
       <button id="fwd5" aria-label="Adelantar 5 segundos">+5 s</button>
       <button id="mixToggle" aria-pressed="false" title="Silenciar, aislar o bajar instrumentos" hidden>Mezcla</button>
+      <button id="practiceToggle" aria-pressed="false" title="Secciones, pausa entre vueltas y entrenador de velocidad">Práctica</button>
       <span class="spacer"></span>
       <span class="group loop">
         <button id="loopA">Marcar A</button>
@@ -427,7 +462,7 @@ figure.fig { margin: 0; display: flex; flex-direction: column; align-items: cent
       </span>
     </div>
     <div id="timeline" role="slider" aria-label="Posición en la canción"></div>
-    <div class="hint">Clic en una palabra o un acorde para saltar ahí. Espacio: reproducir/pausar · ← →: ±5 s.</div>
+    <div class="hint">Clic en una palabra o un acorde para saltar ahí. Espacio: reproducir/pausar · ← →: ±5 s · A / B: marcar bucle · X: quitarlo.</div>
   </footer>
 </div>
 <audio id="audio" preload="metadata"></audio>
@@ -619,11 +654,13 @@ function fmt(t) {
 }
 function seek(t) {
   if (!audio.src) return;
+  if (practice.wait) cancelLoopWait();
   audio.currentTime = Math.max(0, Math.min(t, duration()));
   update(true);
 }
 function togglePlay() {
   if (!audio.src) return;
+  if (practice.wait) cancelLoopWait();      // durante la pausa entre vueltas: seguir ya
   if (audio.paused) audio.play().catch(() => {}); else audio.pause();
 }
 
@@ -649,7 +686,7 @@ function lastIndexLE(arr, t) {   // último índice con arr[i] <= t (-1 si ningu
 function update(force) {
   const t = heardTime();
   if (loop.a != null && loop.b != null && t >= loop.b && !audio.paused) {
-    audio.currentTime = loop.a;
+    onLoopEnd();
     return;
   }
 
@@ -722,16 +759,24 @@ function updateLoopRegion() {
   updateGridUI();
 }
 $("#loopA").addEventListener("click", () => {
-  loop.a = audio.currentTime;
+  loop.a = snapToBar(heardTime());
+  practice.laps = 0;
   if (loop.b != null && loop.b <= loop.a) loop.b = null;
   updateLoopRegion();
 });
 $("#loopB").addEventListener("click", () => {
-  if (loop.a == null || audio.currentTime <= loop.a) return;
-  loop.b = audio.currentTime;
+  const b = snapToBar(heardTime());
+  if (loop.a == null || b <= loop.a) return;
+  loop.b = b;
+  practice.laps = 0;
   updateLoopRegion();
 });
-$("#loopClear").addEventListener("click", () => { loop.a = loop.b = null; updateLoopRegion(); });
+$("#loopClear").addEventListener("click", () => {
+  loop.a = loop.b = null;
+  cancelLoopWait();
+  if (trainer.on) stopTrainer("Entrenador detenido: no hay bucle.");
+  updateLoopRegion();
+});
 
 // ---------- Controles ----------
 $("#play").addEventListener("click", togglePlay);
@@ -777,6 +822,9 @@ document.addEventListener("keydown", (e) => {
   if (e.code === "Space") { e.preventDefault(); togglePlay(); }
   else if (e.code === "ArrowLeft") { e.preventDefault(); seek(audio.currentTime - 5); }
   else if (e.code === "ArrowRight") { e.preventDefault(); seek(audio.currentTime + 5); }
+  else if (e.code === "KeyA" && !e.ctrlKey && !e.metaKey && !e.altKey) $("#loopA").click();
+  else if (e.code === "KeyB" && !e.ctrlKey && !e.metaKey && !e.altKey) $("#loopB").click();
+  else if (e.code === "KeyX" && !e.ctrlKey && !e.metaKey && !e.altKey) $("#loopClear").click();
 });
 
 // ---------- Panel de diagramas ----------
@@ -1709,6 +1757,19 @@ async function applyFxNow() {
   }
 }
 
+// Vigilante: tras varios saltos seguidos el navegador a veces deja el audio "sonando" sin datos
+// (readyState 1) y sin avanzar. Volver a saltar al mismo punto lo destraba.
+const stall = { t: -1, since: 0 };
+setInterval(() => {
+  if (audio.paused || !audio.src || audio.readyState >= 3) { stall.t = -1; return; }
+  const now = performance.now();
+  if (audio.currentTime !== stall.t) { stall.t = audio.currentTime; stall.since = now; return; }
+  if (now - stall.since > 1200) {
+    stall.since = now;
+    audio.currentTime = audio.currentTime;
+  }
+}, 300);
+
 // Con las fuentes en WebAudio, un contexto suspendido (pestaña en segundo plano, móvil) dejaría mudo el audio
 audio.addEventListener("play", () => {
   if (fx.routes.size && audioCtx && audioCtx.state !== "running") audioCtx.resume();
@@ -1935,12 +1996,245 @@ audio.addEventListener("seeked", () => syncStems(true));
 audio.addEventListener("ratechange", () => syncStems(true));
 setInterval(() => syncStems(false), 100);
 
-$("#mixToggle").addEventListener("click", () => {
-  const open = !$("#mixer").classList.contains("open");
-  $("#mixer").classList.toggle("open", open);
-  $("#mixToggle").setAttribute("aria-pressed", String(open));
-  mixStatus();
+$("#mixToggle").addEventListener("click", () => openDrawer("mixer"));
+
+// ---------- Práctica: secciones, pausa entre vueltas y entrenador de velocidad ----------
+// Las secciones se guardan por canción en este navegador. La pausa entre vueltas deja tiempo para
+// volver a colocar las manos; con la rejilla definida (Notas → Partitura) puede ser un compás de
+// cuenta con el metrónomo. El entrenador sube la velocidad cada N vueltas hasta el objetivo.
+const practice = { songId: null, sections: [], laps: 0, wait: null, countClicks: [] };
+const trainer = { on: false };
+
+const barSeconds = () => (grid.offset == null ? null : (60 / grid.bpm) * beatsPerBar());
+const pct = (r) => Math.round(r * 100) + " %";
+
+function snapToBar(t) {
+  const bar = barSeconds();
+  if (!$("#snapBars").checked || bar == null) return t;
+  return Math.max(0, grid.offset + Math.round((t - grid.offset) / bar) * bar);
+}
+
+function currentRate() { return parseFloat($("#speed").value) || 1; }
+function setSpeed(rate) {
+  const value = String(+rate.toFixed(2));
+  if (![...$("#speed").options].some((o) => o.value === value)) return;
+  $("#speed").value = value;
+  applySpeed();
+}
+
+// Opciones de velocidad (50–125 %, de 5 en 5) y de los selectores del entrenador
+function buildSpeedOptions() {
+  const fill = (sel, lo, hi, chosen, fmtFn) => {
+    sel.replaceChildren();
+    for (let r = lo; r <= hi + 1e-9; r += 0.05) {
+      const v = String(+r.toFixed(2));
+      const o = document.createElement("option");
+      o.value = v;
+      o.textContent = fmtFn(+v);
+      if (Math.abs(+v - chosen) < 1e-9) o.selected = true;
+      sel.append(o);
+    }
+  };
+  fill($("#speed"), 0.5, 1.25, 1, (r) => r + "×");
+  fill($("#tnFrom"), 0.5, 1, loadPref("tnFrom", 0.7), pct);
+  fill($("#tnTo"), 0.6, 1.25, loadPref("tnTo", 1), pct);
+  $("#tnStep").value = String(loadPref("tnStep", 0.05));
+  $("#tnReps").value = String(loadPref("tnReps", 2));
+}
+
+// ----- Secciones -----
+function setupPractice(songId) {
+  cancelLoopWait();
+  practice.songId = songId;
+  practice.sections = loadPref("sections:" + songId, []).filter((s) => Number.isFinite(s.a) && s.b > s.a);
+  practice.laps = 0;
+  stopTrainer("");
+  renderSections();
+  refreshPracticeUI();
+}
+
+function saveSections() { savePref("sections:" + practice.songId, practice.sections); }
+
+function renderSections(selectedName) {
+  const sel = $("#secSelect");
+  sel.replaceChildren();
+  const head = document.createElement("option");
+  head.value = "";
+  head.textContent = practice.sections.length ? "Ir a una sección…" : "Sin secciones guardadas";
+  sel.append(head);
+  practice.sections.forEach((s, i) => {
+    const o = document.createElement("option");
+    o.value = String(i);
+    o.textContent = `${s.name} (${fmt(s.a)}–${fmt(s.b)})`;
+    if (s.name === selectedName) o.selected = true;
+    sel.append(o);
+  });
+  $("#secDel").disabled = !sel.value;
+}
+
+$("#secSelect").addEventListener("change", (e) => {
+  const s = practice.sections[Number(e.target.value)];
+  $("#secDel").disabled = !s;
+  if (!s) return;
+  cancelLoopWait();
+  loop.a = s.a;
+  loop.b = s.b;
+  practice.laps = 0;
+  updateLoopRegion();
+  seek(s.a);
+  $("#secName").value = s.name;
 });
+
+$("#secSave").addEventListener("click", () => {
+  if (loop.a == null || loop.b == null) { pStatus("Marca A y B primero: la sección es el bucle actual."); return; }
+  const name = $("#secName").value.trim().slice(0, 30) || `Sección ${practice.sections.length + 1}`;
+  const existing = practice.sections.find((s) => s.name.toLowerCase() === name.toLowerCase());
+  if (existing) { existing.a = loop.a; existing.b = loop.b; existing.name = name; }
+  else practice.sections.push({ name, a: loop.a, b: loop.b });
+  practice.sections.sort((x, y) => x.a - y.a);
+  saveSections();
+  renderSections(name);
+  pStatus(`Guardada «${name}» (${fmt(loop.a)}–${fmt(loop.b)}).`);
+});
+
+$("#secDel").addEventListener("click", () => {
+  const i = Number($("#secSelect").value);
+  if (!practice.sections[i]) return;
+  const [gone] = practice.sections.splice(i, 1);
+  saveSections();
+  renderSections();
+  pStatus(`Borrada «${gone.name}».`);
+});
+
+// ----- Pausa entre vueltas y cuenta -----
+function loopGapSeconds() {
+  const v = $("#loopGap").value;
+  if (v === "bar") {
+    const bar = barSeconds();
+    return bar == null ? 2 : bar / currentRate();
+  }
+  return Number(v) || 0;
+}
+
+function cancelLoopWait() {
+  if (practice.wait) { clearTimeout(practice.wait); practice.wait = null; }
+  practice.countClicks.forEach((n) => { try { n.stop(); } catch { /* ya sonó */ } });
+  practice.countClicks = [];
+}
+
+function countIn(seconds) {               // un compás de clics que termina justo donde vuelve el audio
+  const ctx = ensureAudioCtx();
+  if (!ctx) return;
+  const per = beatsPerBar();
+  const beat = seconds / per;
+  const lag = fx.on ? fx.latency : 0;     // el audio procesado llega con retraso; la cuenta también
+  for (let i = 0; i < per; i++) {
+    const t = ctx.currentTime + lag + i * beat;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.frequency.value = i === 0 ? 1500 : 1000;
+    gain.gain.setValueAtTime(0.0001, t);
+    gain.gain.exponentialRampToValueAtTime(0.35, t + 0.002);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.05);
+    osc.connect(gain).connect(ctx.destination);
+    osc.start(t);
+    osc.stop(t + 0.06);
+    practice.countClicks.push(osc);
+  }
+}
+
+// Llamada desde update() cuando lo que se oye llega al final del bucle
+function onLoopEnd() {
+  practice.laps++;
+  if (trainer.on) trainerLap();
+  audio.currentTime = loop.a;
+  const gap = loopGapSeconds();
+  if (gap > 0) {
+    audio.pause();
+    if ($("#loopGap").value === "bar" && barSeconds() != null) countIn(gap);
+    practice.wait = setTimeout(() => {
+      practice.wait = null;
+      practice.countClicks = [];
+      audio.play().catch(() => {});
+    }, gap * 1000);
+  }
+  refreshPracticeUI();
+}
+
+// ----- Entrenador de velocidad -----
+function readTrainer() {
+  return {
+    from: Number($("#tnFrom").value), to: Number($("#tnTo").value),
+    step: Number($("#tnStep").value), reps: Math.max(1, Number($("#tnReps").value) || 1),
+  };
+}
+
+function stopTrainer(message) {
+  trainer.on = false;
+  $("#tnOn").checked = false;
+  if (message !== undefined) pStatus(message);
+}
+
+function trainerLap() {
+  const t = readTrainer();
+  if (practice.laps % t.reps !== 0) return;
+  const cur = currentRate();
+  if (cur >= t.to - 1e-9) return;           // ya en el objetivo: sigue repitiendo
+  setSpeed(Math.min(t.to, cur + t.step));
+}
+
+$("#tnOn").addEventListener("change", (e) => {
+  if (!e.target.checked) { stopTrainer("Entrenador detenido."); refreshPracticeUI(); return; }
+  if (loop.a == null || loop.b == null) { stopTrainer("Marca A y B (o elige una sección) para usar el entrenador."); return; }
+  const t = readTrainer();
+  if (t.to <= t.from) { stopTrainer("El objetivo tiene que ser mayor que la velocidad inicial."); return; }
+  trainer.on = true;
+  practice.laps = 0;
+  setSpeed(t.from);
+  cancelLoopWait();
+  seek(loop.a);
+  ensureAudioCtx();
+  audio.play().catch(() => {});
+  refreshPracticeUI();
+});
+["tnFrom", "tnTo", "tnStep", "tnReps"].forEach((id) => {
+  $("#" + id).addEventListener("change", (e) => { savePref(id, Number(e.target.value)); refreshPracticeUI(); });
+});
+$("#snapBars").addEventListener("change", (e) => savePref("snapBars", e.target.checked));
+$("#loopGap").addEventListener("change", (e) => { savePref("loopGap", e.target.value); refreshPracticeUI(); });
+
+function pStatus(text) { $("#pStatus").textContent = text; }
+
+function refreshPracticeUI() {
+  const hasGrid = barSeconds() != null;
+  $("#snapBars").disabled = !hasGrid;
+  $("#snapBars").parentElement.title = hasGrid ? "" : "Define la rejilla en Notas → Partitura para ajustar al compás";
+  const barOpt = $("#loopGap").querySelector('option[value="bar"]');
+  barOpt.textContent = hasGrid ? "1 compás con cuenta" : "1 compás con cuenta (requiere rejilla)";
+  if (!trainer.on) return;
+  const t = readTrainer();
+  const cur = currentRate();
+  const left = t.reps - (practice.laps % t.reps);
+  pStatus(cur >= t.to - 1e-9
+    ? `Objetivo alcanzado: ${pct(cur)}. Vuelta ${practice.laps + 1}.`
+    : `Vuelta ${practice.laps + 1} a ${pct(cur)} · sube a ${pct(Math.min(t.to, cur + t.step))} en ${left} vuelta${left === 1 ? "" : "s"}.`);
+}
+
+// Paneles de abajo: Mezcla y Práctica, uno a la vez
+function openDrawer(id) {
+  ["mixer", "practice"].forEach((d) => {
+    const open = d === id && !$("#" + d).classList.contains("open");
+    $("#" + d).classList.toggle("open", open);
+    $(d === "mixer" ? "#mixToggle" : "#practiceToggle").setAttribute("aria-pressed", String(open));
+  });
+  if (id === "mixer") mixStatus();
+  if (id === "practice") refreshPracticeUI();
+}
+$("#practiceToggle").addEventListener("click", () => openDrawer("practice"));
+
+buildSpeedOptions();
+$("#snapBars").checked = loadPref("snapBars", false);
+$("#loopGap").value = String(loadPref("loopGap", "0"));
 
 // ---------- Carga de canciones ----------
 async function loadSong(id) {
@@ -1961,6 +2255,7 @@ async function loadSong(id) {
   renderRollBar();
   if (rollOpen) ensureNotes();
   setupMixer(data);
+  setupPractice(data.id);
   rows = buildRows(data.lines || [], chords);
   document.title = data.title + " · Visor de acordes";
   renderSheet();
